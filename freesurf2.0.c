@@ -57,7 +57,7 @@ double sweep_spiral(double delta, double kappa);
 
 #define TERMALIZACION 10 // número de sweeps para la termalización
 #define NTAU 10 // Número de configuraciones que se registran
-#define TAU 1 // Se registran las configuraciones cada TAU sweeps 
+#define TAU 10 // Se registran las configuraciones cada TAU sweeps 
 #define RESET 5 //Periodo de sweeps en el que se resetean las posiciones 
 
 #define DELTA0 0.1 // Lado del cubo inicial de donde se elige aleatoriamente el vector epsilon
@@ -173,12 +173,11 @@ int main(void)
   
 
   /* 1ª PARTE: PARÁMETROS TOPOLÓGICOS */
-
   indice_vecnos_prox();  /*Cálcula v[N][6], dirv_ini[i], zv1[i]*/
   indice_vecnos_seg(); /*Cálcula v[N][6], dirv2_ini[i], z2[i]*/
   indice_vecnos_ord();
   indice_plqta_ord();
-  // files_topology();  /*Guarda en archivos lo anteriormente calculado */
+  files_topology();  /*Guarda en archivos lo anteriormente calculado */
 
   // 2º PARTE: Configuración inicial
 
@@ -330,11 +329,12 @@ void indice_vecnos_prox()
       for(s1=0; s1<L; s1++)
 	{
 	  i=s1+L*s2;
-	  vec_new=NO;
-
+	  vec_old=NO;
+	  zv1[i]=0;
+	  dirv1_ini[i]=0;
+	  dirv1_fin[i]=0;
 	  for(dir=0; dir<6; dir++)
 	    {
-	      vec_old=vec_new;
 	      if(s1>=rombo[dir].min.s1 && s1<rombo[dir].max.s1 && s2>=rombo[dir].min.s2 && s2<rombo[dir].max.s2)
 		{
 		  v1[i][dir] = i + basev1[dir].s1 + L * basev1[dir].s2;
@@ -350,6 +350,7 @@ void indice_vecnos_prox()
 		dirv1_ini[i]=dir;
 	      if(vec_old-vec_new>0)
 		dirv1_fin[i]=dir-1;
+	     vec_old=vec_new; 
 	    }
 	}
     }
