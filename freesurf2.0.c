@@ -53,10 +53,10 @@ double sweep_spiral(double delta, double kappa);
 #define NB 2*(L-1)
 #define NF 2*(L-3)// Se cumple N = 2*NB + NC + 2*NF
 
-#define TERMALIZACION 8000000 // número de sweeps para la termalización
-#define NTAU 1000 // Número de configuraciones que se registran
-#define TAU 16000 // Se registran las configuraciones cada TAU sweeps 
-#define RESET 1000 //Periodo de sweeps en el que se resetean las posiciones 
+#define TERMALIZACION 10 // número de sweeps para la termalización
+#define NTAU 10 // Número de configuraciones que se registran
+#define TAU 10 // Se registran las configuraciones cada TAU sweeps 
+#define RESET 5 //Periodo de sweeps en el que se resetean las posiciones 
 
 #define DELTA0 0.1 // Lado del cubo inicial de donde se elige aleatoriamente el vector epsilon
 #define MIN_Racept 0.40 // Porcentaje mínimo de la razon de aceptacion de configuraiones
@@ -168,7 +168,7 @@ int main(void)
   indice_vecnos_seg(); /*Cálcula v[N][6], dirv2_ini[i], z2[i]*/
   indice_vecnos_ord();
   indice_plqta_ord();
-  // files_topology();  /*Guarda en archivos lo anteriormente calculado */
+  files_topology();  /*Guarda en archivos lo anteriormente calculado */
 
   // 2º PARTE: Configuración inicial
 
