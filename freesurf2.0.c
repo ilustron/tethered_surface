@@ -26,6 +26,8 @@
 
 void regparam(void );
 
+int sigma_min(int );
+int sigma_max(int );
 void indice_vecnos_prox(void);
 void indice_vecnos_seg(void);
 void indice_vecnos_ord(void);
@@ -242,6 +244,28 @@ int main(void)
     }
     
 return 1;
+}
+
+int sigma_min(int si)
+{
+  int simin;
+
+  if(si<0)
+    simin=-si;
+  else
+    simin=0;
+  return simin;
+}
+
+int sigma_max(int si)
+{
+  int simax;
+
+  if(si>0)
+    simax=L-si;
+  else
+    simax=L;
+  return simax;
 }
 
 /* INDICE_VECNOS_PROX()
