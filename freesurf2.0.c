@@ -153,6 +153,14 @@ typedef struct{double a,b,c;} vector;
 
 vector x[N],n[M];
 
+typedef struct{int s1,s2;}vector2D; 
+
+vector2D basev1[6];
+
+typedef struct{vector2D min,max;}rect;
+
+rect rombo[6];
+
 int main(void)
 {
   int i,cont;
@@ -285,91 +293,67 @@ int sigma_max(int si)
 *
 *
 */
-void indice_vecnos_prox(void)
+void indice_vecnos_prox()
 {
   int s1,s2;
   int s1min,s1max,s2min,s2max;
   int dir;
-  int s1_dir,s2_dir,s1_dir_old,s2_dir_old;
-  int vecino_dir[N];
-  int vecino_dir_anterior;
+  int s1_dir,s2_dir,s1_old,s2_old;
   int i;
-
-  for(i=0; i<N; i++)
-    vecino_dir[N]=NO;
-
+  int vec_new,vec_old;
+  int ord;
+ 
   for(s1_dir=1,s2_dir=0,dir=0; dir<6; dir++)
     {
-      switch(s1_dir)
+      basev1[dir].s1=s1_dir;
+      basev1[dir].s2=s2_dir;
+      
+      s1_old=s1_dir;
+      s2_old=s2_dir;
+      
+      s1_dir=-s2_old;
+      s2_dir= s1_old + s2_old;
+    }
+  
+  for(dir=0; dir<6; dir++)
+    {
+      rombo[dir].min.s1=sigma_min(basev1[dir].s1);
+      rombo[dir].max.s1=sigma_max(basev1[dir].s1);
+      rombo[dir].min.s2=sigma_min(basev1[dir].s2);
+      rombo[dir].max.s2=sigma_max(basev1[dir].s2);
+    }
+
+  // Cálculo de v[N][6],zv[N]
+
+  for(s2=0; s2<L; s2++)
+    {
+      for(s1=0; s1<L; s1++)
 	{
-	case -1:
-	  s1min=1;
-	  s1max=L;
-	  break;
-	case 0:
-	  s1min=0;
-	  s1max=L;
-	  break;
-	case 1:
-	  s1min=0;
-	  s1max=L-1;
-	  break;
+	  i=s1+L*s2;
+	  vec_new=NO;
+
+	  for(dir=0; dir<6; dir++)
+	    {
+	      vec_old=vec_new;
+	      if(s1>=rombo[dir].min.s1 && s1<rombo[dir].max.s1 && s2>=rombo[dir].min.s2 && s2<rombo[dir].max.s2)
+		{
+		  v1[i][dir] = i + basev1[dir].s1 + L * basev1[dir].s2;
+		  zv1[i]+=1;
+		  vec_new=SI;
+		}
+	      else
+		{
+		  v1[i][dir]=-1;
+		  vec_new=NO;
+		}
+	      if(vec_old-vec_new<0)
+		dirv1_ini[i]=dir;
+	      if(vec_old-vec_new>0)
+		dirv1_fin[i]=dir-1;
+	    }
 	}
-
-      switch(s2_dir)
-	{
-	case -1:
-	  s2min=1;
-	  s2max=L;
-	  break;
-	case 0:
-	  s2min=0;
-	  s2max=L;
-	  break;
-	case 1:
-	  s2min=0;
-	  s2max=L-1;
-	  break;
-	}
-
-      for(s2=0; s2<L; s2++)
-	{
-	for(s1=0; s1<L; s1++)
-	  {
-	    i=s1+L*s2;
-	    vecino_dir_anterior=vecino_dir[i];
-
-	    if(s1>=s1min && s1<s1max && s2>=s2min && s2<s2max)
-	      {
-		v1[i][dir] = i + s1_dir + L*s2_dir;
-		zv1[i]+=1;
-		vecino_dir[i]=SI;
-		if(vecino_dir_anterior==NO)
-		  dirv1_ini[i]=dir;
-	      }
-	    else
-	      {
-		v1[i][dir]=-1;
-		vecino_dir[i]=NO;
-		if(vecino_dir_anterior==SI)
-		  {
-		    if(dir==0)
-		      dirv1_fin[i]=5;
-		    else
-		      dirv1_fin[i]=dir-1;
-		  }
-	      }
-	  }
-	}
-
-      s1_dir_old=s1_dir;
-      s2_dir_old=s2_dir;
-
-      s1_dir=-s2_dir_old;
-      s2_dir=s1_dir_old + s2_dir_old;
     }
 }
-
 /* INDICE_VECNOS_SEG()
 *  Cálcula para cada nodo i de los N:
 *   * zv2[i] : Número de cordinación para primeros vecinos
