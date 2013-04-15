@@ -42,7 +42,10 @@ void ini_random(unsigned long long semilla);
 void files_topology(void);
 
 void tipos_nodos(void);
-int vectores_iniciales(int );
+
+void iniconf_flat(void);
+int iniconf_read(int );
+
 double sweep_spiral(double delta, double kappa);
 
 #define SEMILLA 123421
@@ -56,7 +59,7 @@ double sweep_spiral(double delta, double kappa);
 #define NF 2*(L-3)// Se cumple N = 2*NB + NC + 2*NF
 
 #define TERMALIZACION 10 // número de sweeps para la termalización
-#define NTAU 10 // Número de configuraciones que se registran
+#define NTAU 5 // Número de configuraciones que se registran
 #define TAU 10 // Se registran las configuraciones cada TAU sweeps 
 #define RESET 5 //Periodo de sweeps en el que se resetean las posiciones 
 
@@ -64,7 +67,7 @@ double sweep_spiral(double delta, double kappa);
 #define MIN_Racept 0.40 // Porcentaje mínimo de la razon de aceptacion de configuraiones
 #define MAX_Racept 0.60 // Porcentaje máximo de la razon de aceptacion de configuraiones
 
-#define LASTFILE 0
+#define LASTFILE 4 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
  
 #define SI 1
 #define NO 0
@@ -181,15 +184,21 @@ int main(void)
 
   // 2º PARTE: Configuración inicial
 
-  tipos_nodos();
-  vectores_iniciales(LASTFILE);  /*Cálcula x[N] y n[N] para red triangular plana */
-
-  sprintf(nameout,"xpos%d_inicial.dat",L,cont);
-  output=fopen(nameout,"w");
+  tipos_nodos();// calcula indices de los tipos de nodos
+  if(LASTFILE==0)
+    {
+      iniconf_flat();  /*Cálcula x[N] y n[N] para red triangular plana */
+      sprintf(nameout,"xpos%d_inicial.dat",L,cont);
+      output=fopen(nameout,"w");
   
-  for(i=0; i<N; i++)
-    fprintf(output,"%lf %lf %lf \n",x[i].a,x[i].b,x[i].c);
-  fclose(output);
+      for(i=0; i<N; i++)
+	fprintf(output,"%lf %lf %lf \n",x[i].a,x[i].b,x[i].c);
+      fclose(output);
+    }
+  else if(iniconf_read(LASTFILE)==0)
+    {
+      return 0;
+    }
 
   // 3ª PARTE: Metropolis
 
@@ -197,28 +206,29 @@ int main(void)
 
   delta=DELTA0;
 
-  for(sweep=0; sweep<TERMALIZACION; sweep++)// Termalizacion
+  if(LASTFILE==0)
     {
-      ratio_acept=sweep_spiral(delta,KAPPA);
-
-      if(sweep%RESET==0)
+      for(sweep=0; sweep<TERMALIZACION; sweep++)// Termalizacion
 	{
-	  for(i=1; i<N; i++)
+	  ratio_acept=sweep_spiral(delta,KAPPA);
+	  
+	  if(sweep%RESET==0)
 	    {
-	      _restigual(x[i],x[0]);
-	    }
-	  x[0].a=0.0F;
-	  x[0].b=0.0F;
-	  x[0].c=0.0F;
+	      for(i=1; i<N; i++)
+		{
+		  _restigual(x[i],x[0]);
+		}
+	      x[0].a=0.0F;
+	      x[0].b=0.0F;
+	      x[0].c=0.0F;
+	    }	  
+	  if(ratio_acept<MIN_Racept)
+	    delta/=2.0F;	
+	  if(ratio_acept>MAX_Racept)
+	    delta*=2.0F;    
 	}
-
-      if(ratio_acept<MIN_Racept)
-	delta/=2.0F;	
-      if(ratio_acept>MAX_Racept)
-	delta*=2.0F;
-
     }
-
+  
   for(cont=0; cont<NTAU; cont++)// Registro configuraciones 
     {
       for(sweep=0; sweep<TAU; sweep++)
@@ -242,7 +252,7 @@ int main(void)
 	    delta*=2.0F;
 	}
 
-      sprintf(nameout,"xpos_L%d_K%.1f-%d.dat",L,KAPPA,cont);
+      sprintf(nameout,"xpos_L%d_K%.1f-%d.dat",L,KAPPA,cont+1+LASTFILE);
       output=fopen(nameout,"w");
       
       for(i=0; i<N; i++)
@@ -801,102 +811,117 @@ void tipos_nodos(void)
 	  cont++;
 	}
 }
-/*VECTORES INICIALES: Cálculo vectores iniciales correspondientes red triangular regular plana*/
-int vectores_iniciales(int a)
+// Configuración inicial plana
+void iniconf_flat()
 {
   vector sigma1,sigma2;
-  vector r1,r2,r3,ntemp;
   int i,j,s1,s2;
   double l;
+      
+  l=1.0F; /* Distancia entre vecinos red triangular */
+  
+  sigma1.a=l;
+  sigma1.b=0.0F;
+  sigma1.c=0.0F;
+  
+  sigma2.a=0.5F*l;
+  sigma2.b=0.5F*sqrt(3)*l;
+  sigma2.c=0.0F;
+  
+  /* Vectores de posición iniciales = red triangular regular*/
+  
+  
+  for(i=0; i<N; i++)
+    {
+      s1=i % L;
+      s2=i/L;
+	  
+      x[i].a= sigma1.a * (double) s1+ sigma2.a * (double) s2;
+      x[i].b= sigma2.b * (double) s2;
+      x[i].c= 0.0F;
+    }
+  
+  /* Vectores normales iniciales = red triangular regular */
+  
+  for(j=0; j<M; j++)
+    {
+      n[j].a=0.0F;
+      n[j].b=0.0F;
+      n[j].c=1.0F;
+    }
+}
+//Configuracion inicial: lee del archivo
+int iniconf_read(int lf)
+{
+  vector r1,r2,r3,ntemp;
+  int i,j,s1,s2,dir;
+  int p[N][6];
+  double l,norma2,invnorma;
   FILE *input;
   char namein[255];
 
-  if(a==0)// red plana inicialmente
-    {
   
-      l=1.0F; /* Distancia entre vecinos red triangular */
-      
-      sigma1.a=l;
-      sigma1.b=0.0F;
-      sigma1.c=0.0F;
-      
-      sigma2.a=0.5F*l;
-      sigma2.b=0.5F*sqrt(3)*l;
-      sigma2.c=0.0F;
-      
-      /* Vectores de posición iniciales = red triangular regular*/
-      
-      
-      for(i=0; i<N; i++)
+  // Cargamos los índices p[N][6]
+
+  for(i=0; i<N; i++)
+    {
+      for(dir=0; dir<6; dir++)
 	{
-	  s1=i % L;
-	  s2=i/L;
+	  p[i][dir]=index_plqta_prox(i,dir);
+	}
+    } 
+
+  sprintf(namein,"xpos_L%d_K%.1f-%d.dat",L,KAPPA,lf); 
+  if((input=fopen(namein,"r"))!=NULL)
+    {
+      i=0;
+      while(fscanf(input,"%f %f %f",&x[i].a,&x[i].b,&x[i].c)!=EOF)
+	i++;
+    }
+  else
+    {
+      printf("Error: El archivo %s no existe\n",namein);
+      return 0;
+    }
+  if(i!=N)
+    {
+      printf("Error: El fichero %s no contiene %d líneas\n",namein,N);
+      return 0;
+    }
+  fclose(input);
+  
+  for(s1=1; s1<L; s1++)// caluculamos las normales
+    {
+      for(s2=0; s2<L-1; s2++)
+	{
+		  
+	  i=s1+L*s2;
 	  
-	  x[i].a= sigma1.a * (double) s1+ sigma2.a * (double) s2;
-	  x[i].b= sigma2.b * (double) s2;
-	  x[i].c= 0.0F;
-	}
-
-      /* Vectores normales iniciales = red triangular regular */
-
-      for(j=0; j<M; j++)
-	{
-	  n[j].a=0.0F;
-	  n[j].b=0.0F;
-	  n[j].c=1.0F;
-	}
-      else //red inicial continuación de anteriores RUNS
-	{
-	  sprintf(namein,"xpos_L%d_K%.1-%d.dat",L,KAPPA,a); 
-	  if((input=fopen(namein,"r"))!=NULL)
-	    {
-	      i=0;
-	      while(fscanf(input,"%f %f %f",&x[i].a,&x[i].b,&x[i].c)!=EOF)
-		i++;
-	    }
-	  else
-	    {
-	      printf("Error: El archivo %s no existe\n",namein);
-	      return 1;
-	    }
-	  if(i!=N)
-	    {
-	      printf("Error: El fichero %s no contiene %d líneas\n",namein,N);
-	      return 1;
-	    }
-	  fclose(input);
-
-	  for(s1=1; s1<L; s1++)// caluculamos las normales
-	    {
-	      for(s2=0; s2<L-1; s2++)
-		{
+	  //Vectores relativos:
+	  
+	  _resta(r1,x[v1[i][1]],x[i]);
+	  _resta(r2,x[v1[i][2]],x[i]);
+	  _resta(r3,x[v1[i][3]],x[i]);
 		  
-		  i=s1+L*s2;
-		  
-		  //Vectores relativos:
-		  
-		  _resta(r1,x[v1[i][1]],x[i]);
-		  _resta(r2,x[v1[i][2]],x[i]);
-		  _resta(r3,x[v1[i][3]],x[i]);
-		  
-		  //Productos vectoriales:
-		  
-		  _prodvec(ntemp,r1,r2);
-		  norma2=_norma2(ntemp);
-		  invnorma=1.0F/sqrt(norma2);
-		  _escala(ntemp,invnorma);
-		  n[p[i][1]]=ntemp;
-		  
-		  _prodvec(ntemp,r2,r3);
-		  norma2=_norma2(ntemp);
-		  invnorma=1.0F/sqrt(norma2);
-		  _escala(ntemp,invnorma);
-		  n[p[i][2]]=ntemp;
-		}
-	    }	  
+	  //Productos vectoriales:
+	  
+	  _prodvec(ntemp,r1,r2);
+	  norma2=_norma2(ntemp);
+	  invnorma=1.0F/sqrt(norma2);
+	  _escala(ntemp,invnorma);
+	  n[p[i][1]]=ntemp;
+	  
+	  _prodvec(ntemp,r2,r3);
+	  norma2=_norma2(ntemp);
+	  invnorma=1.0F/sqrt(norma2);
+	  _escala(ntemp,invnorma);
+	  n[p[i][2]]=ntemp;
 	}
     }
+  return 1;
 }
+
+
 /*SWEEP_SPIRAL: Aplica algoritmo de metropolis*/
 double sweep_spiral(double delta, double kappa)
 {
