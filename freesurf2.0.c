@@ -185,6 +185,7 @@ int main(void)
   // 2º PARTE: Configuración inicial
 
   tipos_nodos();// calcula indices de los tipos de nodos
+
   if(LASTFILE==0)
     {
       iniconf_flat();  /*Cálcula x[N] y n[N] para red triangular plana */
@@ -252,7 +253,7 @@ int main(void)
 	    delta*=2.0F;
 	}
 
-      sprintf(nameout,"xpos_L%d_K%.1f-%d.dat",L,KAPPA,cont+1+LASTFILE);
+      sprintf(nameout,"xpos_L%d_K%.1f-%d.dat",L,KAPPA,cont+(LASTFILE!=0)+LASTFILE);
       output=fopen(nameout,"w");
       
       for(i=0; i<N; i++)
@@ -1363,13 +1364,23 @@ void regparam(void )
   FILE *output;
   int i;
 
-  output=fopen("regparams.log","w"); 
-  
+  if(LASTFILE==0)
+    {
+      output=fopen("regparams.log","w");
+      fprintf(output,"********************************************************************\n");
+      fprintf(output,"Primer RUN\n");
+    }
+  else
+    {
+      output=fopen("regparams.log","a");
+      fprintf(output,"********************************************************************\n");
+      fprintf(output,"Continuación de los RUNS a partir del archivo nº %d.\n",LASTFILE);
+    }
   fprintf(output,"Tamaño de la red: \n");
   fprintf(output,"L=%d N=%d M=%d \n",L,N,M); 
   fprintf(output,"NC=%d NB=%d NF=%d \n",NC,NB,NF);
   fprintf(output,"\n");
-  fprintf(output,"Sweep2: \n");
+  fprintf(output,"Sweep: \n");
   fprintf(output,"Termalizacion=%d Ntau=%d tau=%d Reset=%d \n",TERMALIZACION,NTAU,TAU,RESET);
   fprintf(output,"Semilla=%d \n",SEMILLA);
   fprintf(output,"\n");
