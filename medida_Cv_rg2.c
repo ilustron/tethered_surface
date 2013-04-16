@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 
-float radio_giraton(void);
-float energia_curvatura(void);
+double radio_giraton(void);
+double energia_curvatura(void);
 
 void index_vcnos_prox();
 
@@ -15,9 +15,9 @@ int index_plqta_prox(int i, int dir);
 #define L 16
 #define N L*L 
 #define M 2*(L-1)*(L-1) 
-#define K 1.1 // Kappa 
-#define NF 24000 // nº de archivos
-#define B 200 // nº de bloques (Jack-Knife)
+#define K 0.5 // Kappa 
+#define NF 1000 // nº de archivos
+#define B 100 // nº de bloques (Jack-Knife)
 
 #define _prodesc(w,u) (w.a*u.a+w.b*u.b+w.c*u.c)
 
@@ -45,11 +45,11 @@ int index_plqta_prox(int i, int dir);
                         u.b = -v.b; \
                         u.c = -v.c; 
 
-typedef struct{float a,b,c;} vector;
+typedef struct{double a,b,c;} vector;
 
 vector x[N];
 int v[N][6],p[N][6];// indices puntos y plaquetas vecinos
-float Se[NF],rg2[NF];
+double Se[NF],rg2[NF];
 
 
 int main(void )// Faltan las funciones que determina los índices de las plaquetas 
@@ -63,24 +63,24 @@ int main(void )// Faltan las funciones que determina los índices de las plaquet
   int i,j,k,l,f,dir;
   int n; // nº de elementos del bloque
 
-  float sum_rg2; //Radio de giraton, Suma de sus valores
-  float media_rg2;// media del radio del giraton al cuadrado
-  float rg2JK[B];
-  float sumJK_rg2;
-  float error_rg2;
+  double sum_rg2; //Radio de giraton, Suma de sus valores
+  double media_rg2;// media del radio del giraton al cuadrado
+  double rg2JK[B];
+  double sumJK_rg2;
+  double error_rg2;
 
-  float sum_Se,sum2_Se; // Energia de curvatura, suma, suma de cuadrados
-  float media_Se;// media del radio de la Energia de curvatura
-  float media_Se2;
-  float sumJK_Se;
-  float sum2JK_Se;
-  float SeJK[B],SeJK2[B];
-  float Vare;
+  double sum_Se,sum2_Se; // Energia de curvatura, suma, suma de cuadrados
+  double media_Se;// media del radio de la Energia de curvatura
+  double media_Se2;
+  double sumJK_Se;
+  double sum2JK_Se;
+  double SeJK[B],SeJK2[B];
+  double Vare;
 
-  float error_Se;
+  double error_Se;
 
-  float Cv,CvJK;
-  float error_Cv;
+  double Cv,CvJK;
+  double error_Cv;
 
   // Cargamos los índices v[N][6]
 
@@ -122,13 +122,13 @@ int main(void )// Faltan las funciones que determina los índices de las plaquet
     }
 
   f=0;
-  sprintf(namein,"xpos_L%d_K1.1-%d.dat",L,f);
+  sprintf(namein,"xpos_L%d_K%.1f-%d.dat",L,K,f);
 
   while((input=fopen(namein,"r"))!=NULL)
     {
       i=0;
 
-      while(fscanf(input,"%f %f %f",&x[i].a,&x[i].b,&x[i].c)!=EOF)
+      while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
 	i++;
    
       if(i!=N)
@@ -148,7 +148,7 @@ int main(void )// Faltan las funciones que determina los índices de las plaquet
       SeJK2[l]+=(Se[f]*Se[f]);
 
       f++;
-      sprintf(namein,"xpos_L%d_K1.1-%d.dat",L,f);
+      sprintf(namein,"xpos_L%d_K%.1f-%d.dat",L,K,f);
     }
   
   if(f!=NF)
@@ -159,53 +159,53 @@ int main(void )// Faltan las funciones que determina los índices de las plaquet
 
   // Radio del giratón
 
-  media_rg2=sum_rg2/(float)NF;
+  media_rg2=sum_rg2/(double)NF;
 
   error_rg2=0.0F;
 
   for (k=0; k<B; k++)
     {
-      sumJK_rg2=(sum_rg2-rg2JK[k])/(float)(NF-n);
+      sumJK_rg2=(sum_rg2-rg2JK[k])/(double)(NF-n);
       error_rg2+=pow(sumJK_rg2-media_rg2,2.0);
     }
 
-  error_rg2=(float)(B-1)/((float) B) * error_rg2;
+  error_rg2=(double)(B-1)/((double) B) * error_rg2;
   error_rg2=sqrt(error_rg2);
   
-  printf("1) media Rg2=%f +- %f\n", media_rg2, error_rg2);
+  printf("1) media Rg2=%lf +- %lf\n", media_rg2, error_rg2);
 
   //Media Se:
 
-  media_Se=sum_Se/(float)NF;
+  media_Se=sum_Se/(double)NF;
 
   error_Se=0.0F;
     
   for (k=0; k<B; k++)
     {
-	sumJK_Se=(sum_Se-SeJK[k])/(float)(NF-n);
+	sumJK_Se=(sum_Se-SeJK[k])/(double)(NF-n);
 	error_Se+=pow(sumJK_Se-media_Se,2.0);
     }
 
-  error_Se=(float)(B-1)/((float) B) * error_Se;
+  error_Se=(double)(B-1)/((double) B) * error_Se;
   error_Se=sqrt(error_Se);
   
-  printf("1) media=%f +- %f\n", media_Se, error_Se);
+  printf("1) media=%lf +- %lf\n", media_Se, error_Se);
 
   //Calor específico:
 
-  Cv=sum2_Se/(float)NF-sum_Se*sum_Se/(float)NF/(float)NF;
-  Cv*=(K*K)/((float)N);
+  Cv=sum2_Se/(double)NF-sum_Se*sum_Se/(double)NF/(double)NF;
+  Cv*=(K*K)/((double)N);
 
   error_Cv=0;
   for (k=0; k<B; k++)
     {
-      sum2JK_Se=(sum2_Se-SeJK2[k])/(float)(NF-n);
-      sumJK_Se=(sum_Se-SeJK[k])/(float)(NF-n);
+      sum2JK_Se=(sum2_Se-SeJK2[k])/(double)(NF-n);
+      sumJK_Se=(sum_Se-SeJK[k])/(double)(NF-n);
       CvJK=sum2JK_Se-sumJK_Se*sumJK_Se;
-      CvJK*=(K*K)/((float)N);
+      CvJK*=(K*K)/((double)N);
       error_Cv+=pow(Cv-CvJK,2.0);
     }
-  error_Cv=(float)(B-1.)/((float) B) * error_Cv;
+  error_Cv=(double)(B-1.)/((double) B) * error_Cv;
   error_Cv=sqrt(error_Cv);
   
   printf("1) Cesp=%lf+-%lf\n",Cv, error_Cv);
@@ -214,15 +214,15 @@ int main(void )// Faltan las funciones que determina los índices de las plaquet
   return 1;
 }
 
-float energia_curvatura(void)
+double energia_curvatura(void)
 {
   
   int i,j,k;
   int s1,s2;
-  float Se;
+  double Se;
   
   vector r1,r2,r3,ntemp,n[M];
-  float norma2,invnorma;
+  double norma2,invnorma;
  
   Se=0.0F;
 
@@ -444,11 +444,11 @@ int index_plqta_prox(int i, int dir)
     }
   return p;
 }
-float radio_giraton(void )
+double radio_giraton(void )
 {
   int i;
-  float sum_norma2,norma2,norma2sumx,norma2xcm;
-  float densidad,momento2,r2giraton;
+  double sum_norma2,norma2,norma2sumx,norma2xcm;
+  double densidad,momento2,r2giraton;
   vector sum_x,xcm;
   
 
@@ -467,12 +467,12 @@ float radio_giraton(void )
       sum_norma2+=norma2;      
     }
   
-  densidad=1.0F/ ((float) N);
+  densidad=1.0F/ ((double) N);
   
   xcm=sum_x;
   _escala(xcm,densidad);   
   norma2xcm=_norma2(xcm);
-  momento2=sum_norma2/ ((float) N);
+  momento2=sum_norma2/ ((double) N);
 
     return r2giraton=(momento2-norma2xcm)/3.0F;
 }

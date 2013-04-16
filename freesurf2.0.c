@@ -49,7 +49,7 @@ int iniconf_read(int );
 
 double sweep_spiral(double delta, double kappa);
 
-#define SEMILLA 123421
+#define SEMILLA 329571
 #define KAPPA 0.5
 
 #define L 16
@@ -59,16 +59,16 @@ double sweep_spiral(double delta, double kappa);
 #define NB 2*(L-1)
 #define NF 2*(L-3)// Se cumple N = 2*NB + NC + 2*NF
 
-#define TERMALIZACION 10 // número de sweeps para la termalización
-#define NTAU 10 // Número de configuraciones que se registran
-#define TAU 10 // Se registran las configuraciones cada TAU sweeps 
-#define RESET 5 //Periodo de sweeps en el que se resetean las posiciones 
+#define TERMALIZACION 8000000 // número de sweeps para la termalización
+#define NTAU 499 // Número de configuraciones que se registran
+#define TAU 16000 // Se registran las configuraciones cada TAU sweeps 
+#define RESET 1000 //Periodo de sweeps en el que se resetean las posiciones 
 
 #define DELTA0 0.1 // Lado del cubo inicial de donde se elige aleatoriamente el vector epsilon
 #define MIN_Racept 0.40 // Porcentaje mínimo de la razon de aceptacion de configuraiones
 #define MAX_Racept 0.60 // Porcentaje máximo de la razon de aceptacion de configuraiones
 
-#define LASTFILE 0 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
+#define LASTFILE 500 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
  
 #define SI 1
 #define NO 0
@@ -168,15 +168,11 @@ rect rombov1[6],rombov2[6];
 
 int main(void)
 {
-  int i,cont;
+  int i,cont,e;
   int sweep;
   double delta,ratio_acept;
   char nameout[255];
   FILE *output;
-
-  time_t tiempo = time(0);
-  struct tm *tlocal = localtime(&tiempo);
-  char date[128];
   
   regparam();// Guardamos los parámetros de la ejecución en archivo.
   
@@ -202,9 +198,7 @@ int main(void)
       fclose(output);
     }
   else if(iniconf_read(LASTFILE)==0)
-    {
-      return 0;
-    }
+    return 0;
 
   // 3ª PARTE: Metropolis
 
@@ -267,13 +261,7 @@ int main(void)
 
     }
 
-  //Escribimos en rgparams.log la fecha y hora finalización de la ejecución
-  output=fopen("regparams.log","a");
-  strftime(date,128,"%d/%m/%y %H:%M:%S",tlocal);//guardamos en date la fecha y hora actual
-  fprintf(output,"Ejecución finalizada  %s\n",date);
-  fclose(output);    
-
-return 1;
+  return 1;
 }
 
 int sigma_min(int si)
@@ -887,7 +875,7 @@ int iniconf_read(int lf)
   if((input=fopen(namein,"r"))!=NULL)
     {
       i=0;
-      while(fscanf(input,"%f %f %f",&x[i].a,&x[i].b,&x[i].c)!=EOF)
+      while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
 	i++;
     }
   else
@@ -902,7 +890,7 @@ int iniconf_read(int lf)
     }
   fclose(input);
   
-  for(s1=1; s1<L; s1++)// caluculamos las normales
+  for(s1=1; s1<L; s1++)// calculamos las normales
     {
       for(s2=0; s2<L-1; s2++)
 	{
@@ -1384,13 +1372,13 @@ void regparam(void )
     {
       output=fopen("regparams.log","w");
       fprintf(output,"********************************************************************\n");
-      fprintf(output,"Primer RUN %s\n",date);
+      fprintf(output,"Primer RUN date=%s\n",date);
     }
   else
     {
       output=fopen("regparams.log","a");
       fprintf(output,"********************************************************************\n");
-      fprintf(output,"Continuación de los RUNS a partir del archivo nº %d.\n",LASTFILE);
+      fprintf(output,"Continuación de los RUNS a partir del archivo nº %d date=%s\n",LASTFILE,date);
     }
   fprintf(output,"Tamaño de la red: \n");
   fprintf(output,"L=%d N=%d M=%d \n",L,N,M); 
