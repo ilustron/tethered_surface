@@ -50,25 +50,25 @@ int iniconf_read(int );
 double sweep_spiral(double delta, double kappa);
 
 #define SEMILLA 329571
-#define KAPPA 0.5
+#define KAPPA 1.1
 
-#define L 16
+#define L 256
 #define N L*L
 #define M 2*(L-1)*(L-1)
 #define NC (L-4)*(L-4)
 #define NB 2*(L-1)
 #define NF 2*(L-3)// Se cumple N = 2*NB + NC + 2*NF
 
-#define TERMALIZACION 8000000 // número de sweeps para la termalización
-#define NTAU 499 // Número de configuraciones que se registran
-#define TAU 16000 // Se registran las configuraciones cada TAU sweeps 
+#define TERMALIZACION 1000 // número de sweeps para la termalización
+#define NTAU 1000 // Número de configuraciones que se registran
+#define TAU 2000000 // Se registran las configuraciones cada TAU sweeps 
 #define RESET 1000 //Periodo de sweeps en el que se resetean las posiciones 
 
 #define DELTA0 0.1 // Lado del cubo inicial de donde se elige aleatoriamente el vector epsilon
 #define MIN_Racept 0.40 // Porcentaje mínimo de la razon de aceptacion de configuraiones
 #define MAX_Racept 0.60 // Porcentaje máximo de la razon de aceptacion de configuraiones
 
-#define LASTFILE 500 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
+#define LASTFILE 8 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
  
 #define SI 1
 #define NO 0
@@ -261,6 +261,11 @@ int main(void)
 
     }
 
+  //Guarda en regparams.log el delta final
+
+  output=fopen("regparams.log","a");
+  fprintf(output,"Delta final=%f \n",delta);
+  fclose(output);
   return 1;
 }
 
@@ -1391,7 +1396,6 @@ void regparam(void )
   fprintf(output,"Parametros Metropolis:\n");
   fprintf(output,"Kappa=%f\n",KAPPA);
   fprintf(output,"Delta inicial=%f mín.razon_acept=%f max.razon_acept=%f \n",DELTA0,MIN_Racept,MAX_Racept);
-  fprintf(output,"\n");
   fclose(output);
 
 }
