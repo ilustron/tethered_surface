@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 void regparam(void );
 
@@ -59,7 +60,7 @@ double sweep_spiral(double delta, double kappa);
 #define NF 2*(L-3)// Se cumple N = 2*NB + NC + 2*NF
 
 #define TERMALIZACION 10 // número de sweeps para la termalización
-#define NTAU 5 // Número de configuraciones que se registran
+#define NTAU 10 // Número de configuraciones que se registran
 #define TAU 10 // Se registran las configuraciones cada TAU sweeps 
 #define RESET 5 //Periodo de sweeps en el que se resetean las posiciones 
 
@@ -67,7 +68,7 @@ double sweep_spiral(double delta, double kappa);
 #define MIN_Racept 0.40 // Porcentaje mínimo de la razon de aceptacion de configuraiones
 #define MAX_Racept 0.60 // Porcentaje máximo de la razon de aceptacion de configuraiones
 
-#define LASTFILE 4 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
+#define LASTFILE 0 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
  
 #define SI 1
 #define NO 0
@@ -173,6 +174,10 @@ int main(void)
   char nameout[255];
   FILE *output;
 
+  time_t tiempo = time(0);
+  struct tm *tlocal = localtime(&tiempo);
+  char date[128];
+  
   regparam();// Guardamos los parámetros de la ejecución en archivo.
   
   /* 1ª PARTE: PARÁMETROS TOPOLÓGICOS */
@@ -261,7 +266,13 @@ int main(void)
       fclose(output);
 
     }
-    
+
+  //Escribimos en rgparams.log la fecha y hora finalización de la ejecución
+  output=fopen("regparams.log","a");
+  strftime(date,128,"%d/%m/%y %H:%M:%S",tlocal);//guardamos en date la fecha y hora actual
+  fprintf(output,"Ejecución finalizada  %s\n",date);
+  fclose(output);    
+
 return 1;
 }
 
@@ -1363,12 +1374,17 @@ void regparam(void )
 {
   FILE *output;
   int i;
+  time_t tiempo = time(0);
+  struct tm *tlocal = localtime(&tiempo);
+  char date[128];
+
+  strftime(date,128,"%d/%m/%y %H:%M:%S",tlocal);//guardamos en date la fecha y hora actual
 
   if(LASTFILE==0)
     {
       output=fopen("regparams.log","w");
       fprintf(output,"********************************************************************\n");
-      fprintf(output,"Primer RUN\n");
+      fprintf(output,"Primer RUN %s\n",date);
     }
   else
     {
