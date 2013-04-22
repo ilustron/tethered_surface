@@ -23,7 +23,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include <time.h>
+
+#include <unistd.h>  /* UNIX standard function definitions */
+#include <fcntl.h>   /* UNIX file descriptors controls */
+#include <errno.h>   /* UNIX system calls error codes definitions*/
 
 void regparam(void );
 
@@ -49,7 +54,7 @@ int iniconf_read(int );
 
 double sweep_spiral(double delta, double kappa);
 
-#define SEMILLA 329571
+//#define SEMILLA 329571
 #define KAPPA 1.1
 
 #define L 256
@@ -202,7 +207,8 @@ int main(void)
 
   // 3ª PARTE: Metropolis
 
-  ini_random(SEMILLA);
+  Get_Seed_From_System();
+  ini_random(zseed);
 
   delta=DELTA0;
 
@@ -1361,6 +1367,18 @@ void ini_random(unsigned long long semilla)
     if (!PRRANDOM)
       printf("Found zero in the first P-R random numbers generated\n");
 }
+void Get_Seed_From_System()
+{
+  FILE* Frandfile;
+  int zseed_p;
+
+  zseed_p=0;
+  Frandfile = fopen("/dev/urandom","r");
+  fread(&zseed_p,sizeof(int),1,Frandfile);
+  zseed=(unsigned long long) abs(zseed_p);
+  fclose(Frandfile);
+}
+
 // regparam: Parametros de la simulacion
 
 void regparam(void )
