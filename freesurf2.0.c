@@ -114,7 +114,7 @@ double sweep_spiral(double delta, double kappa);
                         u.b = -v.b; \
                         u.c = -v.c;
 
-void Get_Seed_From_System(void);
+void Get_Seed_From_System(void);//Lee la semilla de los nº aleatorios del sistema
 
 // Parámetros números aleatorios:
 

@@ -1,5 +1,5 @@
 //COMPILAR CON:
-//gcc -O2 -DK=0.9 -DL=16 -DNF=1000 -DTAU=16000 -DTERMAL=8000000 medida_Rg2.c -lm -o medida_Rg2.out 
+//gcc -O2 -DK=2.0 -DL=16 -DNF=1000 -DTAU=16000 -DTERMAL=8000000 medida_Rg2.c -lm -o medida_Rg2.out 
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -101,16 +101,17 @@ int main(void )
   //TERMALIZACION:
   sprintf(nameout,"./MEDIDAS_Rg2/L%d/K%.1f/termalizacionRg2_L%d_K%.1f.dat",L,K,L,K);
   output=fopen(nameout,"w"); 
-  for(f=NF; f>0; f--)
+  for(f=50; f<NF; f++)
     {      
       if((NF%f)==0)
       {
-	      b=NF/f;
-	      n=b-1;
-	      media_radio2g=Radio2g[n]/(double)b;
-	      fprintf(output,"%d %lf\n",b,media_radio2g);
+	      media_radio2g=(Radio2g[NF-1]-Radio2g[NF-f-1])/(double)(f);
+	      fprintf(output,"%lf %lf\n",1.0F/(double)(f),media_radio2g);
       }
     }
+  media_radio2g=Radio2g[NF-1]/(double)NF;
+  fprintf(output,"%lf %lf\n",1.0F/(double)NF,media_radio2g);
+
   fclose(output);
 
   //GRÁFICA GNUPLOT TERMALIZACION:
@@ -128,13 +129,9 @@ int main(void )
   fprintf(pipe,"set terminal pop\n");
   fflush(pipe);
 
-  getchar(); //Pausa
-  
-  //Esta parte corresponde a introducir por teclado el valor observado para la termalización
-
   ftermal=0;
 
-  /*printf("Escribe el valor de sweep/TAU correspondiente a la termalización:\n");
+  printf("Escribe el valor de sweep/TAU correspondiente a la termalización:\n");
   
   while(scanf("%d",&ftermal)==0 || ftermal<0)
     {
@@ -144,7 +141,7 @@ int main(void )
 
   //Escribimos el valor de la termalización oobservada en el archivo .log
   fprintf(filelog,"Termalización:\n");
-  fprintf(filelog," nfile_termal=%d sweep_obs_termalizacion=%d\n",ftermal,ftermal*TAU+NTERMAL);*/
+  fprintf(filelog," nfile_termal=%d sweep_obs_termalizacion=%d\n",ftermal,ftermal*TAU+NTERMAL);
   
 
   if((fmax=NF-ftermal)!=NF)
@@ -156,16 +153,16 @@ int main(void )
       
       sprintf(nameout,"./MEDIDAS_Rg2/L%d/K%.1f/termalizacionRg2NEW_L%d_K%.1f.dat",L,K,L,K);
       output=fopen(nameout,"w"); 
-      for(f=fmax; f>0; f--)
-	{
+      for(f=50; f<fmax; f++)
+	{      
 	  if((fmax%f)==0)
 	    {
-	      b=fmax/f;
-	      n=b-1;
-	      media_radio2g=Radio2g[n]/(double)b;
-	      fprintf(output,"%d %lf\n",b,media_radio2g);
+	      media_radio2g=(Radio2g[fmax-1]-Radio2g[fmax-f-1])/(double)(f);
+	      fprintf(output,"%lf %lf\n",1.0F/(double)(f),media_radio2g);
 	    }
-	}//El último valor que toma media_radio2g es el correcto
+	}
+      media_radio2g=Radio2g[fmax-1]/(double)fmax;
+      fprintf(output,"%lf %lf\n",1.0F/(double)fmax,media_radio2g);
       fclose(output);
       
       pipe = popen("gnuplot -persist","w");
@@ -233,8 +230,7 @@ int main(void )
   fflush(pipe);
   close(pipe);
 
-  getchar();//pausa
-  /*
+  
   // Radio del giratón Valor del error
   printf("Escribe el tamaño del bloque Jacknife en donde se estabiliza el error:\n");  
   while(scanf("%d",&nbloq)==0 || nbloq<0)
@@ -261,10 +257,10 @@ int main(void )
   close(input);
 
   //Escribimos en el archivo log los valores del tamaño del bloque Jacknife al que estabiliza el error
-  fprintf(filelog,"Error:\n");
-  fprintf(filelog,"tamaño bloque=%d tamaño bloque (sweep)=%d \n",nbloq,nbloq*TAU);
-  close(filelog);
-  */
+  //fprintf(filelog,"Error:\n");
+  //fprintf(filelog,"tamaño bloque=%d tamaño bloque (sweep)=%d \n",nbloq,nbloq*TAU);
+  //close(filelog);
+  
 
   printf("media Rg2=%lf +- %lf\n", media_radio2g, error_radio2g);//El último valor del error corresponde a un tamaño de bloque 1
 
