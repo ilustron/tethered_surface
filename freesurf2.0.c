@@ -64,16 +64,16 @@ double sweep_spiral(double delta, double kappa);
 #define NB 2*(L-1)
 #define NF 2*(L-3)// Se cumple N = 2*NB + NC + 2*NF
 
-#define TERMALIZACION 1000 // número de sweeps para la termalización
-#define NTAU 1000 // Número de configuraciones que se registran
-#define TAU 2000000 // Se registran las configuraciones cada TAU sweeps 
-#define RESET 1000 //Periodo de sweeps en el que se resetean las posiciones 
+#define TERMALIZACION 10 // número de sweeps para la termalización
+#define NTAU 10 // Número de configuraciones que se registran
+#define TAU 2 // Se registran las configuraciones cada TAU sweeps 
+#define RESET 1 //Periodo de sweeps en el que se resetean las posiciones 
 
 #define DELTA0 0.1 // Lado del cubo inicial de donde se elige aleatoriamente el vector epsilon
 #define MIN_Racept 0.40 // Porcentaje mínimo de la razon de aceptacion de configuraiones
 #define MAX_Racept 0.60 // Porcentaje máximo de la razon de aceptacion de configuraiones
 
-#define LASTFILE 8 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
+#define LASTFILE 0 // si es 0 la configuración inicial es plana, si es diferente lee la configuración de ese archivo
  
 #define SI 1
 #define NO 0
@@ -113,6 +113,8 @@ double sweep_spiral(double delta, double kappa);
 		        u.a = -v.a; \
                         u.b = -v.b; \
                         u.c = -v.c;
+
+void Get_Seed_From_System(void);
 
 // Parámetros números aleatorios:
 
@@ -179,7 +181,7 @@ int main(void)
   char nameout[255];
   FILE *output;
   
-  regparam();// Guardamos los parámetros de la ejecución en archivo.
+  
   
   /* 1ª PARTE: PARÁMETROS TOPOLÓGICOS */
   indice_vecnos_prox();  /*Cálcula v[N][6], dirv_ini[i], zv1[i]*/
@@ -208,8 +210,9 @@ int main(void)
   // 3ª PARTE: Metropolis
 
   Get_Seed_From_System();
-  ini_random(zseed);
 
+  regparam();// Guardamos los parámetros de la ejecución en archivo.
+  
   delta=DELTA0;
 
   if(LASTFILE==0)
@@ -1375,7 +1378,7 @@ void Get_Seed_From_System()
   zseed_p=0;
   Frandfile = fopen("/dev/urandom","r");
   fread(&zseed_p,sizeof(int),1,Frandfile);
-  zseed=(unsigned long long) abs(zseed_p);
+  zseed=(randint) abs(zseed_p);
   fclose(Frandfile);
 }
 
@@ -1409,7 +1412,7 @@ void regparam(void )
   fprintf(output,"\n");
   fprintf(output,"Sweep: \n");
   fprintf(output,"Termalizacion=%d Ntau=%d tau=%d Reset=%d \n",TERMALIZACION,NTAU,TAU,RESET);
-  fprintf(output,"Semilla=%d \n",SEMILLA);
+  fprintf(output,"Semilla=%llu \n",zseed);
   fprintf(output,"\n");
   fprintf(output,"Parametros Metropolis:\n");
   fprintf(output,"Kappa=%f\n",KAPPA);
@@ -1448,7 +1451,7 @@ output=fopen("indicev2.dat","w"); /* dirv1_ini[i]   dirv1_fin[i]   zv1[i] */
 output=fopen("index_comparacion.dat","w");
   for(i=0; i<N; i++)
     {
-      fprintf(output,"%4d %4d %4d %4d\n",dirv1_ini[i], zv1[i],dirv2_ini[i], zv2[i]);
+      fprintf(output,"%4d %4d %4d %4d\n",dirv1_ini[i], zv1[i],dirv2_ini[i], zv2[i]); 
     }
   fclose(output);
   output=fopen("v2.dat","w");
