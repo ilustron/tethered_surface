@@ -123,21 +123,21 @@ int main(void )
   fprintf(pipe,"set terminal push\n");
 
   //guardamos el gráfico en formato latex en el disco:
-  fprintf(pipe,"set terminal epslatex size 10cm,20cm color colortext\n");
-  fprintf(pipe,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/termalizacionRg2_L%d_K%.1f.tex\" \n",L,K,L,K);
+  fprintf(pipe,"set terminal epslatex color colortext\n");
+  fprintf(pipe,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/Plottermal_Rg2_L%d.tex\" \n",L,K,L,K);
   fprintf(pipe, "set title \' Termalización $L=%d$ $K=%.1f$ \' \n",L,K);
   fprintf(pipe, "set logscale x\n");
   fprintf(pipe, "set xlabel \'número de sweeps/($\\tau$=%d)\' \n",TAU);
   fprintf(pipe, "set ylabel \' promedio $R^2_g$ acumulado\'\n");
   fprintf(pipe, "plot \"%s\" title \'$R_g^2$\' w lp\n",nameout);
   
-  //vuelve a la anterior terminal
+  //vuelve a la anterior terminal gnuplot:
   fprintf(pipe,"set output\n");
   fprintf(pipe,"set terminal pop\n");
 
-  //vacía el buffer de la tubería
+  //vacía el buffer de la tubería gnuplot y se cierra:
   fflush(pipe);
-
+  //close(pipe);
   //Entrada del valor del índice del archivo en el que se produce la termalización
 
   ftermal=0;
@@ -164,7 +164,12 @@ int main(void )
   // Error en función del nº de bloques
 
   sprintf(nameout,"./MEDIDAS_Rg2/L%d/K%.1f/error_Rg2_L%d_K%.1f.dat",L,K,L,K);
-  output=fopen(nameout,"w"); 
+  output=fopen(nameout,"w");
+  printf("\n Plot Error L=%d K=%.1f: \n",L,K);
+  printf(" X=tamaño del bloque Jacknife\n");
+  printf(" Y=error \n");
+  
+  printf("\n X  Y\n"); 
   for(b=2; b<=fmax; b++)
     {
       if((fmax%b)==0)
@@ -188,26 +193,38 @@ int main(void )
 	  error_radio2g=(double)(b-1)/((double) b) * error_radio2g;
 	  error_radio2g=sqrt(error_radio2g);
 	  fprintf(output,"%d %lf\n",n,error_radio2g);  
+	  printf(" %d %lf\n",n,error_radio2g);  
 	}
     }
   fclose(output);
       
-  //GRAFICA GNUPLOT ERROR: Error en función del tamaño del bloque Jacknife
+  //GRAFICA GNUPLOT ERROR
+  pipe = popen("gnuplot -persist","w");//tubería a gnuplot
 
-  pipe = popen("gnuplot -persist","w");  
-  fprintf(pipe, "set title \" Error en función del tamaño del bloque Jacknife\" \n");
+  //grafico en pantalla:  
+  fprintf(pipe, "set title \" Error vs. tamaño del bloque Jacknife L=%d K=%.1f\" \n",L, K);
   fprintf(pipe, "set logscale x\n");
-  fprintf(pipe, "set xlabel\" tamaño del bloque jacknife = sweeps/(tau=%d)\"\n",TAU);
+  fprintf(pipe, "set xlabel\" tamaño del bloque jacknife  (sweeps/tau)\"\n",TAU);
   fprintf(pipe, "set ylabel\"error radio2g \"\n");  
   fprintf(pipe, "plot \"%s\" title \"Radio2 g\" w lp\n",nameout);
   fprintf(pipe,"set terminal push\n");
-  fprintf(pipe,"set terminal png\n");
-  fprintf(pipe,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/errorRg2_L%d_K%.1f.png\" \n",L,K,L,K);
-  fprintf(pipe,"replot\n");
+
+  //guardamos el gráfico en formato latex en el disco:
+  fprintf(pipe,"set terminal epslatex size 10cm,20cm color colortext\n");
+  fprintf(pipe,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/errorRg2_L%d_K%.1f.tex\" \n",L,K,L,K);
+  fprintf(pipe, "set title \' Error $L=%d$ $K=%.1f$ \' \n",L,K);
+  fprintf(pipe, "set logscale x\n");
+  fprintf(pipe, "set xlabel \'tamaño del bloque Jacknife (sweeps/($\\tau_{art}$=%d))\' \n",TAU);
+  fprintf(pipe, "set ylabel \' Error $R^2_g$ \'\n");
+  fprintf(pipe, "plot \"%s\" title \'Error $R_g^2$\' w lp\n",nameout);
+
+  //Vuelve a la anterior terminal gnuplot:
   fprintf(pipe,"set output\n");
   fprintf(pipe,"set terminal pop\n");
+
+  //Vacía el buffer de la tubería gnuplot y se cierra:
   fflush(pipe);
-  close(pipe);
+  //close(pipe);
 
   
   // Radio del giratón Valor del error
@@ -242,7 +259,7 @@ int main(void )
   filerg2=fopen(namerg2,"a");
   fprintf(filerg2,"%lf %lf %lf\n", K, media_radio2g, error_radio2g);
   close(filerg2);
-
+  close(pipe);
   return 1;
 }
 
