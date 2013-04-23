@@ -28,16 +28,19 @@ vector x[N];
 
 int main(void )
 {
-  FILE *input;
-  FILE *output;
-  FILE *filerg2;
-  FILE *pipe;
+  FILE *input;// -> Archivo de lectura = Posiciones 3d de los nodos  
+  FILE *ftermal;// -> Archivo de escritura = Termalización
+  FILE *ferror;// -> Archivo de escritura = Error vs. Tamaño del bloque Jacknife 
+  FILE *filerg2;// -> Archivo de escritura = Valores Rg2 con errores
+  FILE *pipegp = popen("gnuplot -persist","w");//Tubería a gnuplot (gráficas)  
   
   char namein[255];
-  char nameout[255];
+  char nametermal[255];
+  char nameerror[255];
   char namerg2[255];
 
   //OBSERVABLES
+  double radio2gflat;//Observable fase completamente plana
   double radio2g[NF];//observable 
   double Radio2g[NF];//valor acumulado  
   double media_radio2g;// media del radio del giraton al cuadrado
@@ -51,14 +54,35 @@ int main(void )
   double error_radio2g;
 
   int i,k,f,b,n;
-  int ftermal,ntermal;
+  int indtermal;
 
   int fmax;
   int nbloq;
 
 
   // LECTURA ARCHIVOS FUENTE (Correspondientes a las posiciones de los nodos de la membrana)
- 
+
+  //Archivo de configuración inicial = fase completamente plana
+  
+  sprintf(namein,"./RUNS/L%d/K%.1f/xpos%d_inicial.dat",L,K,L);
+  if((input=fopen(namein,"r"))==NULL)
+    {
+      printf("Error existencial: El archivo $s no existe\n",namein); 
+      return 0;
+    }      
+  i=0;      
+  while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
+    i++;
+  
+  fclose(input);     
+  if(i!=N)
+    {
+      printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
+      return 0;
+    }
+  radio2gflat=radio_giraton();
+    
+  //Lectura de lo archivos de posiciones resultantes de la simulación
   f=0;
   Radio2g[NF-1]=0.0F;
   
@@ -72,7 +96,7 @@ int main(void )
       fclose(input);     
       if(i!=N)
 	{
-	  printf("Error: El fichero %s no contiene %d líneas\n",namein,N);
+	  printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
 	  return 0;
 	}
       radio2g[f]=radio_giraton();
@@ -84,88 +108,85 @@ int main(void )
   
   if(f!=NF)
     {
-      printf("Error:El número de archivos leidos en ./RUNS/L%d/K%.1f/ no es %d\n",L,K,NF); 
+      printf("Error lectura: El número de archivos leidos en ./RUNS/L%d/K%.1f/ no es %d\n",L,K,NF); 
       return 0;
     }
 
   //TERMALIZACION:
 
-  sprintf(nameout,"./MEDIDAS_Rg2/L%d/K%.1f/termalizacionRg2_L%d_K%.1f.dat",L,K,L,K);
-  output=fopen(nameout,"w");
-  printf("\n Plot Termalización L=%d K=%.1f: \n",L,K);
+  sprintf(nametermal,"./MEDIDAS_Rg2/L%d/K%.1f/termalizacion_Rg2_L%d_K%.1f.dat",L,K,L,K);
+  ftermal=fopen(nametermal,"w");
+  printf("\n Plot: Termalización L=%d K=%.1f \n",L,K);
   printf(" X=1/(nº archivos conservados)\n");
   printf(" Y=promedio del radio del giratón al cuadrado\n");
   printf(" Ind.=índice del primer archivo conservado \n");
-  printf("\n Ind. X  Y(promedio)\n");
+  printf("\n Ind. X  Y\n");
   for(f=NF/20; f<NF; f++)
     {      
       if((NF%f)==0)
       {
 	      media_radio2g=(Radio2g[NF-1]-Radio2g[NF-f-1])/(double) f;
-	      fprintf(output,"%lf %lf\n",1.0F/(double) f,media_radio2g);
+	      fprintf(ftermal,"%lf %lf\n",1.0F/(double) f,media_radio2g);
 	      printf(" %d %lf %lf\n",NF-f,1.0F/(double) f,media_radio2g);
       }
     }
   media_radio2g=Radio2g[NF-1]/(double)NF;
-  fprintf(output,"%lf %lf\n",1.0F/(double)NF,media_radio2g);
+  fprintf(ftermal,"%lf %lf\n",1.0F/(double)NF,media_radio2g);
   printf(" %d %lf %lf\n",0,1.0F/(double) f,media_radio2g);
-  fclose(output);
+  fclose(ftermal);
 
   //GRÁFICA GNUPLOT TERMALIZACION:
-  pipe = popen("gnuplot -persist","w");//tubería a gnuplot
+ 
+  fprintf(pipegp,"set terminal push\n");//Guarda la terminal gp por defecto
 
-  //gráfico en pantalla:
-  fprintf(pipe, "set title \" Termalización L=%d K=%.1f\" \n",L,K);
-  fprintf(pipe, "set logscale x\n");
-  fprintf(pipe, "set xlabel\" número de sweeps/(tau=%d)\"\n",TAU);
-  fprintf(pipe, "set ylabel\" promedio radio2g acumulado\"\n");
-  fprintf(pipe, "plot \"%s\" title \"Rg^2\" w lp\n",nameout);
-  fprintf(pipe,"set terminal push\n");
-
-  //guardamos el gráfico en formato latex en el disco:
-  fprintf(pipe,"set terminal epslatex color colortext\n");
-  fprintf(pipe,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/Plottermal_Rg2_L%d.tex\" \n",L,K,L,K);
-  fprintf(pipe, "set title \' Termalización $L=%d$ $K=%.1f$ \' \n",L,K);
-  fprintf(pipe, "set logscale x\n");
-  fprintf(pipe, "set xlabel \'número de sweeps/($\\tau$=%d)\' \n",TAU);
-  fprintf(pipe, "set ylabel \' promedio $R^2_g$ acumulado\'\n");
-  fprintf(pipe, "plot \"%s\" title \'$R_g^2$\' w lp\n",nameout);
+  //Guarda el gráfico en formato latex en el disco:
+  fprintf(pipegp,"set terminal epslatex color colortext\n");
+  fprintf(pipegp,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/Plottermal_Rg2-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp, "set title \' Gráfico Termalización ($L=%d$ $K=%.1f$) \' \n",L,K);
+  fprintf(pipegp, "set logscale x\n");
+  fprintf(pipegp, "set xlabel \'1/ (n\\textdegree de archivos conservados)\' \n");
+  fprintf(pipegp, "set ylabel \' $\\langle R^2_g \\rangle$ \'\n");
+  fprintf(pipegp, "plot \"%s\" title \'$R_g^2$\' w lp\n",nametermal);
   
   //vuelve a la anterior terminal gnuplot:
-  fprintf(pipe,"set output\n");
-  fprintf(pipe,"set terminal pop\n");
+  fprintf(pipegp,"set output\n");
+  fprintf(pipegp,"set terminal pop\n");
 
-  //vacía el buffer de la tubería gnuplot y se cierra:
-  fflush(pipe);
-  //close(pipe);
+  //gráfico en pantalla:
+  fprintf(pipegp, "set title \" Termalización L=%d K=%.1f\" \n",L,K);
+  fprintf(pipegp, "set logscale x\n");
+  fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n",TAU);
+  fprintf(pipegp, "set ylabel\" promedio radio2g acumulado\"\n");
+  fprintf(pipegp, "plot \"%s\" title \"Rg^2\" w lp\n",nametermal);
+    
+  fflush(pipegp);//vacía el buffer de la tubería gnuplot:
+  //close(pipegp);
+  
   //Entrada del valor del índice del archivo en el que se produce la termalización
 
-  ftermal=0;
-
-  printf("Escribe el valor de sweep/TAU correspondiente a la termalización:\n");
+  printf("\n Valor Rg2 configuración plana = %lf\n",radio2gflat);
+  
+  printf("\n Escribe el valor del índice del archivo correspondiente a la termalización=");
  
-  while(scanf("%d",&ftermal)==0 || ftermal<0)
+  while(scanf("%d",&indtermal)==0 || indtermal<0)
     {
       while (getchar()!= '\n');// para leer un único dato por línea
-      printf("Debe ser un número entero positivo:\n"); 
+      printf("\n Debe ser un número entero positivo="); 
     }
 
-  fmax=NF-ftermal;
-
+  fmax=NF-indtermal;//fmax es ahora el nº total de archivos para los cálculos
   for(f=0; f<fmax; f++)//redefinimos los observables
     {
-      Radio2g[f]=Radio2g[f+ftermal]-Radio2g[ftermal-1];
-    }
-      
+      Radio2g[f]=Radio2g[f+indtermal]-Radio2g[indtermal-1];
+    }   
   media_radio2g=Radio2g[fmax-1]/(double)fmax;
-  printf(" %d %lf %lf\n",0,1.0F/(double) f,media_radio2g);
+  printf("\n -> Media rg2= %lf\n",media_radio2g);
       
-  
   // Error en función del nº de bloques
 
-  sprintf(nameout,"./MEDIDAS_Rg2/L%d/K%.1f/error_Rg2_L%d_K%.1f.dat",L,K,L,K);
-  output=fopen(nameout,"w");
-  printf("\n Plot Error L=%d K=%.1f: \n",L,K);
+  sprintf(nameerror,"./MEDIDAS_Rg2/L%d/K%.1f/error_Rg2_L%d_K%d.dat",L,K,L,K);
+  ferror=fopen(nameerror,"w");
+  printf("\n Plot: Error vs. tamaño bloque Jacknife L=%d K=%.1f \n",L,K);
   printf(" X=tamaño del bloque Jacknife\n");
   printf(" Y=error \n");
   
@@ -185,81 +206,82 @@ int main(void )
 	  for (k=1; k<b; k++)
 	    {
 	      radio2gJK[k]=Radio2g[(k+1)*n-1]-Radio2g[k*n-1];
-
 	      sumJK_radio2g=(Radio2g[fmax-1]-radio2gJK[k])/(double)(fmax-n);
 	      error_radio2g+=pow(sumJK_radio2g-media_radio2g,2.0);
 	    }
 
 	  error_radio2g=(double)(b-1)/((double) b) * error_radio2g;
 	  error_radio2g=sqrt(error_radio2g);
-	  fprintf(output,"%d %lf\n",n,error_radio2g);  
+	  fprintf(ferror,"%d %lf\n",n,error_radio2g);  
 	  printf(" %d %lf\n",n,error_radio2g);  
 	}
     }
-  fclose(output);
+  fclose(ferror);
       
   //GRAFICA GNUPLOT ERROR
-  pipe = popen("gnuplot -persist","w");//tubería a gnuplot
 
-  //grafico en pantalla:  
-  fprintf(pipe, "set title \" Error vs. tamaño del bloque Jacknife L=%d K=%.1f\" \n",L, K);
-  fprintf(pipe, "set logscale x\n");
-  fprintf(pipe, "set xlabel\" tamaño del bloque jacknife  (sweeps/tau)\"\n",TAU);
-  fprintf(pipe, "set ylabel\"error radio2g \"\n");  
-  fprintf(pipe, "plot \"%s\" title \"Radio2 g\" w lp\n",nameout);
-  fprintf(pipe,"set terminal push\n");
+  fprintf(pipegp,"set terminal push\n");//Almacena el anterior terminal gp
 
-  //guardamos el gráfico en formato latex en el disco:
-  fprintf(pipe,"set terminal epslatex size 10cm,20cm color colortext\n");
-  fprintf(pipe,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/errorRg2_L%d_K%.1f.tex\" \n",L,K,L,K);
-  fprintf(pipe, "set title \' Error $L=%d$ $K=%.1f$ \' \n",L,K);
-  fprintf(pipe, "set logscale x\n");
-  fprintf(pipe, "set xlabel \'tamaño del bloque Jacknife (sweeps/($\\tau_{art}$=%d))\' \n",TAU);
-  fprintf(pipe, "set ylabel \' Error $R^2_g$ \'\n");
-  fprintf(pipe, "plot \"%s\" title \'Error $R_g^2$\' w lp\n",nameout);
+  //Guardamos el gráfico en formato latex en el disco:
+  fprintf(pipegp,"set terminal epslatex color colortext\n");
+  fprintf(pipegp,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/Ploterror_Rg2-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp, "set title \' Error vs Tamaño Jacknife ($L=%d$ $K=%.1f$) \' \n",L,K);
+  fprintf(pipegp, "set logscale x\n");
+  fprintf(pipegp, "set xlabel \'Tamaño del bloque Jacknife (sweeps/$\\tau_0$)\' \n");
+  fprintf(pipegp, "set ylabel \' Error $R^2_g$ \'\n");
+  fprintf(pipegp, "plot \"%s\" title \'Error $R_g^2$\' w lp\n",nameerror);
 
   //Vuelve a la anterior terminal gnuplot:
-  fprintf(pipe,"set output\n");
-  fprintf(pipe,"set terminal pop\n");
+  fprintf(pipegp,"set output\n");
+  fprintf(pipegp,"set terminal pop\n");
+
+  //Gráfico en pantalla:  
+  fprintf(pipegp, "set title \" Error vs. tamaño del bloque Jacknife L=%d K=%.1f\" \n",L, K);
+  fprintf(pipegp, "set logscale x\n");
+  fprintf(pipegp, "set xlabel\" tamaño del bloque Jacknife (sweeps/tau)\"\n");
+  fprintf(pipegp, "set ylabel\"Error radio2g \"\n");  
+  fprintf(pipegp, "plot \"%s\" title \"Radio2 g\" w lp\n",nameerror);
+
 
   //Vacía el buffer de la tubería gnuplot y se cierra:
-  fflush(pipe);
-  //close(pipe);
+  fflush(pipegp);
+  //close(pipegp);
 
   
-  // Radio del giratón Valor del error
-  printf("Escribe el tamaño del bloque Jacknife en donde se estabiliza el error:\n");  
+  // Radio del giratón vs. Valor del error:
+
+  printf("\n Escribe el tamaño del bloque Jacknife en donde se estabiliza el error=");  
   while(scanf("%d",&nbloq)==0 || nbloq<0)
     {
       while (getchar()!= '\n');// para leer un único dato por línea
-      printf("Debe ser un número entero positivo:\n"); 
+      printf("\n Debe ser un número entero positivo="); 
     }
   
-  input=fopen(nameout,"r");
+  ferror=fopen(nameerror,"r");//Abrimos el archivo de errores para lectura
   while(nbloq!=n)
     {
-      if(fscanf(input,"%d %lf",&n,&error_radio2g)==EOF)
+      if(fscanf(ferror,"%d %lf",&n,&error_radio2g)==EOF)
 	{
-	  close(nameout);
-	  printf("Error: Escribe el número de elementos del bloque Jacknife:\n");  
+	  close(ferror);
+	  printf("\n Debe ser un número válido de elementos del bloque Jacknife=");  
 	  while(scanf("%d",&nbloq)==0 || nbloq<0)
 	    {
 	      while (getchar()!= '\n');// para leer un único dato por línea
-	      printf("Escribe un número entero positivo:\n"); 
+	      printf("\n Escribe un número entero positivo="); 
 	    }
-	  input=fopen(nameout,"r");
+	  ferror=fopen(nameerror,"r");
 	}
     }
-  close(input);
+  close(ferror);
 
-  printf("media Rg2=%lf +- %lf\n", media_radio2g, error_radio2g);//El último valor del error corresponde a un tamaño de bloque 1
+  printf("\n -> Rg2=%lf +- %lf\n", media_radio2g, error_radio2g);
 
   //Escribe el valor de la medida con su error en el archivo valores_Rg2
-  sprintf(namerg2,"./MEDIDAS_Rg2/L%d/valores_Rg2_L%d.dat",L,L);
+  sprintf(namerg2,"./MEDIDAS_Rg2/L%d/Medidas_Rg2_L%d.dat",L,L);
   filerg2=fopen(namerg2,"a");
-  fprintf(filerg2,"%lf %lf %lf\n", K, media_radio2g, error_radio2g);
+  fprintf(filerg2,"%lf %lf %lf %d %d\n", K, media_radio2g, error_radio2g,indtermal,nbloq);
   close(filerg2);
-  close(pipe);
+  close(pipegp);
   return 1;
 }
 
