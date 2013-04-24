@@ -91,8 +91,9 @@ int main(void )
     {
       i=0;      
       while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
-	i++;
-
+	{
+	  i++;
+	}
       fclose(input);     
       if(i!=N)
 	{

@@ -15,7 +15,7 @@ do
     echo Periodo de correlación estimado:
     read tau
 
-    echo Tiempo de correlación estimado:
+    echo Tiempo de termalizacion estimado:
     read termal
 
     for i in `seq 5 11`;
@@ -25,9 +25,13 @@ do
 	echo Medidas para K=$k:
 	gcc -O2 -DK=$k -DL=$l -DNF=$f -DTAU=$tau -DNTERMAL=$termal medida_Rg2.c -lm -o medida_Rg2.out
 	./medida_Rg2.out
-       #Pasa a pdf los eps resultantes
+        #Pasar a pdf los eps resultantes
+	echo Convirtiendo Ploterror_Rg2-L$l-K$i.eps a .pdf
 	epstopdf ./MEDIDAS_Rg2/L$l/K$k/Ploterror_Rg2-L$l-K$i.eps
+	echo Hecho
+	echo Convirtiendo Plotermal_Rg2-L$l-K$i.eps a .pdf
 	epstopdf ./MEDIDAS_Rg2/L$l/K$k/Plottermal_Rg2-L$l-K$i.eps
+	echo Hecho
     done
     
     k=2.0
@@ -36,6 +40,10 @@ do
     gcc -O2 -DK=$k -DL=$l -DNF=$f -DTAU=$tau -DNTERMAL=$termal medida_Rg2.c -lm -o medida_Rg2.out
     ./medida_Rg2.out
     #Pasar a pdf los eps resultantes
+    echo Convirtiendo Ploterror_Rg2-L$l-K20.eps a .pdf
     epstopdf ./MEDIDAS_Rg2/L$l/K$k/Ploterror_Rg2-L$l-K20.eps
-    epstopdf ./MEDIDAS_Rg2/L$l/K$k/Plottermal_Rg2-L$lK20.eps
+    echo Hecho
+    echo Convirtiendo Plotermal_Rg2-L$l-K20.eps a .pdf
+    epstopdf ./MEDIDAS_Rg2/L$l/K$k/Plottermal_Rg2-L$l-K20.eps
+    echo Hecho
 done
