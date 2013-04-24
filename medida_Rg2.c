@@ -157,7 +157,7 @@ int main(void )
   fprintf(pipegp, "set title \" Termalización L=%d K=%.1f\" \n",L,K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n",TAU);
-  fprintf(pipegp, "set ylabel\" promedio radio2g acumulado\"\n");
+  fprintf(pipegp, "set ylabel\" promedio radio2g \"\n");
   fprintf(pipegp, "plot \"%s\" title \"Rg^2\" w lp\n",nametermal);
     
   fflush(pipegp);//vacía el buffer de la tubería gnuplot:
@@ -176,11 +176,15 @@ int main(void )
     }
 
   fmax=NF-indtermal;//fmax es ahora el nº total de archivos para los cálculos
-  for(f=0; f<fmax; f++)//redefinimos los observables
+  if(famx!=NF)
     {
-      Radio2g[f]=Radio2g[f+indtermal]-Radio2g[indtermal-1];
-    }   
-  media_radio2g=Radio2g[fmax-1]/(double)fmax;
+      for(f=0; f<fmax; f++)//redefinimos los observables
+	{
+	  Radio2g[f]=Radio2g[f+indtermal]-Radio2g[indtermal-1];
+	}   
+      media_radio2g=Radio2g[fmax-1]/(double)fmax;
+    }
+
   printf("\n -> Media rg2= %lf\n",media_radio2g);
       
   // Error en función del nº de bloques
@@ -241,7 +245,7 @@ int main(void )
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel\" tamaño del bloque Jacknife (sweeps/tau)\"\n");
   fprintf(pipegp, "set ylabel\"Error radio2g \"\n");  
-  fprintf(pipegp, "plot \"%s\" title \"Radio2 g\" w lp\n",nameerror);
+  fprintf(pipegp, "plot \"%s\" title \"Radio2g\" w lp\n",nameerror);
 
 
   //Vacía el buffer de la tubería gnuplot y se cierra:
@@ -277,7 +281,7 @@ int main(void )
 
   printf("\n -> Rg2=%lf +- %lf\n", media_radio2g, error_radio2g);
 
-  //Escribe el valor de la medida con su error en el archivo valores_Rg2
+  //Escribe el valor de la medida con su error en el archivo Medidas_Rg2
   sprintf(namerg2,"./MEDIDAS_Rg2/L%d/Medidas_Rg2_L%d.dat",L,L);
   filerg2=fopen(namerg2,"a");
   fprintf(filerg2,"%lf %lf %lf %d %d\n", K, media_radio2g, error_radio2g,indtermal,nbloq);
