@@ -1,6 +1,3 @@
-//COMPILAR CON:
-//gcc -O2 -DK=0.9 -DL=16 -DNF=1000 -DTAU=16000 -DTERMAL=8000000 medida_Cv.c -lm -o medida_Cv.out 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -17,8 +14,11 @@ int index_plqta_dir0(int i);
 int index_plqta_dir1(int i);
 int index_plqta_prox(int i, int dir);
 
+//#define K=2.0 // O compilar con la opcion -DK=2.0 
+//#define L=16 // O compilar con la opción -DL=16 
 #define N L*L 
 #define M 2*(L-1)*(L-1) 
+//#define NF=1000 // O compilar con la opción -DNF=1000 
 
 #define _prodesc(w,u) (w.a*u.a+w.b*u.b+w.c*u.c)
 
@@ -188,7 +188,7 @@ int main(void )
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel \'1/ (n\\textdegree de archivos conservados)\' \n");
   fprintf(pipegp, "set ylabel \' $\\langle C_v \\rangle$ \'\n");
-  fprintf(pipegp, "plot \"%s\" title \'$C_v$\' w lp\n",nametermal);
+  fprintf(pipegp, "plot [][0:] \"%s\" title \'$C_v$\' w lp\n",nametermal);
   
   //vuelve a la anterior terminal gnuplot:
   fprintf(pipegp,"set output\n");
@@ -197,9 +197,9 @@ int main(void )
   //gráfico en pantalla:
   fprintf(pipegp, "set title \" Termalización L=%d K=%.1f\" \n",L,K);
   fprintf(pipegp, "set logscale x\n");
-  fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n",TAU);
+  fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n");
   fprintf(pipegp, "set ylabel\" promedio Cv \"\n");
-  fprintf(pipegp, "plot \"%s\" title \"C_v\" w lp\n",nametermal);
+  fprintf(pipegp, "plot [][0:] \"%s\" title \"C_v\" w lp\n",nametermal);
     
   fflush(pipegp);//vacía el buffer de la tubería gnuplot
   

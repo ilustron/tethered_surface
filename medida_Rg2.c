@@ -1,14 +1,15 @@
-//COMPILAR CON:
-//gcc -O2 -DK=2.0 -DL=16 -DNF=1000 -DTAU=16000 -DTERMAL=8000000 medida_Rg2.c -lm -o medida_Rg2.out 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 double radio_giraton(void);
 
+//#define K=2.0 // O compilar con la opcion -DK=2.0 
+//#define L=16 // O compilar con la opción -DL=16 
 #define N L*L 
-#define M 2*(L-1)*(L-1) 
+#define M 2*(L-1)*(L-1)
+//#define NF=1000 // O compilar con la opción -DNF=1000 
+
 #define _escala(u,x) \
                          u.a *= (x);\
                          u.b *= (x);\
@@ -147,7 +148,7 @@ int main(void )
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel \'1/ (n\\textdegree de archivos conservados)\' \n");
   fprintf(pipegp, "set ylabel \' $\\langle R^2_g \\rangle$ \'\n");
-  fprintf(pipegp, "plot \"%s\" title \'$R_g^2$\' w lp\n",nametermal);
+  fprintf(pipegp, "plot [][0:%lf] \"%s\" title \'$R_g^2$\' w lp\n",radio2gflat,nametermal);
   
   //vuelve a la anterior terminal gnuplot:
   fprintf(pipegp,"set output\n");
@@ -156,9 +157,9 @@ int main(void )
   //gráfico en pantalla:
   fprintf(pipegp, "set title \" Termalización L=%d K=%.1f\" \n",L,K);
   fprintf(pipegp, "set logscale x\n");
-  fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n",TAU);
+  fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n");
   fprintf(pipegp, "set ylabel\" promedio radio2g \"\n");
-  fprintf(pipegp, "plot \"%s\" title \"Rg^2\" w lp\n",nametermal);
+  fprintf(pipegp, "plot [][0:%lf] \"%s\" title \"Rg^2\" w lp\n",radio2gflat,nametermal);
     
   fflush(pipegp);//vacía el buffer de la tubería gnuplot:
   //close(pipegp);
@@ -176,7 +177,7 @@ int main(void )
     }
 
   fmax=NF-indtermal;//fmax es ahora el nº total de archivos para los cálculos
-  if(famx!=NF)
+  if(fmax!=NF)
     {
       for(f=0; f<fmax; f++)//redefinimos los observables
 	{
@@ -284,7 +285,7 @@ int main(void )
   //Escribe el valor de la medida con su error en el archivo Medidas_Rg2
   sprintf(namerg2,"./MEDIDAS_Rg2/L%d/Medidas_Rg2_L%d.dat",L,L);
   filerg2=fopen(namerg2,"a");
-  fprintf(filerg2,"%lf %lf %lf %d %d\n", K, media_radio2g, error_radio2g,indtermal,nbloq);
+  fprintf(filerg2,"%lf %lf %lf %lf %d %d\n", K, media_radio2g, error_radio2g,radio2gflat,indtermal,nbloq);
   close(filerg2);
   close(pipegp);
   return 1;
