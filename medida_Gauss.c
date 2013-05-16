@@ -3,12 +3,17 @@
 #include <math.h>
 
 double radio_giraton(void);
-int radio_giraton_inicial(void);
-int Rg2_files(void);
 
+void indice_vecnos_prox();
+
+int sigma_min(int );
+int sigma_max(int );
+
+//#define K=2.0 // O compilar con la opcion -DK=2.0 
+//#define L=16 // O compilar con la opción -DL=16 
 #define N L*L 
 #define M 2*(L-1)*(L-1)
-
+//#define NF=1000 // O compilar con la opción -DNF=1000 
 
 #define _escala(u,x) \
                          u.a *= (x);\
@@ -31,73 +36,161 @@ int Rg2_files(void);
 		        u.a = -v.a; \
                         u.b = -v.b; \
                         u.c = -v.c;
+#define SI 1
+#define NO 0
+
+typedef struct{int s1,s2;}vector2D; 
+
+vector2D basev1[6],basev2[6];
+
+typedef struct{vector2D min,max;}rect;
+
+rect rombov1[6],rombov2[6];
+
+int v1[N][6];
+int dirv1_ini[N],dirv1_fin[N],zv1[N];
 
 typedef struct{double a,b,c;} vector;
 
 vector x[N]; // Vectores de posición de los nodos
-
-double radio2gflat;//Observable fase completamente plana
-double radio2g[NF];//observable 
-double Radio2g[NF];//valor acumulado  
+int v1[N][6]; // Indices de los nodos vecinos
 
 int main(void )
 {
-  FILE *frg2_files;//Archivo de escritura/lectura = Rg2 para cada archivo 
-  FILE *ftermal;// Archivo de escritura = Termalización
-  FILE *ferror;// Archivo de escritura = Error vs. Tamaño del bloque Jacknife 
-  FILE *frg2_LK;// Archivo de escritura = Valores Rg2 con errores
-  FILE *pipegp = popen("gnuplot -persist","w");// Tubería a gnuplot (gráficas)  
+  FILE *input;// -> Archivo de lectura = Posiciones 3d de los nodos  
+  FILE *ftermal;// -> Archivo de escritura = Termalización
+  FILE *ferror;// -> Archivo de escritura = Error vs. Tamaño del bloque Jacknife 
+  FILE *filerg2;// -> Archivo de escritura = Valores Rg2 con errores
+  FILE *pipegp = popen("gnuplot -persist","w");//Tubería a gnuplot (gráficas)  
   
-  char namerg2_files[255];
+  char namein[255];
   char nametermal[255];
   char nameerror[255];
-  char namerg2_LK[255];
+  char namerg2[255];
 
-  //OBSERVABLES:
+  //OBSERVABLES
+  double radio2gflat;//Observable fase completamente plana
+  double radio2g[NF];//observable 
+  double Radio2g[NF];//valor acumulado  
   double media_radio2g;// media del radio del giraton al cuadrado
-  double Radio2gref;// Valor de referencia necesario para redefinir los observables al definir el momento de termalización
+  double Radio2gref;//valor de referencia necesario para redefinir los observables
 
+  //ESPACIADO
+
+  int nlink,s1,s2,dir;
+  double norma2,sum_norma2,a2;
+  vector r;
+  
   //Valores bloque Jacknife
+
   double radio2gJK[NF];
   double sumJK_radio2g;
 
   //Errores
   double error_radio2g;
 
-  //Indices y contadores enteros
   int i,k,f,b,n;
   int indtermal;
+
   int fmax;
   int nbloq;
 
+  indice_vecnos_prox(); // Cargamos los indices de v1[N][6]
 
+  // LECTURA ARCHIVOS FUENTE (Correspondientes a las posiciones de los nodos de la membrana)
 
-  if(radio_giraton_inicial()==1)// Rgiraton² para la conf. incial plana
-    return 1;   
-
-
-  // MEDIDA O LECTURA DEL Rg2 PARA CADA ARCHIVO DE POSICIÓN:
-  sprintf(namerg2_files,"./MEDIDAS_Rg2/L%d/K%.1f/rg2_L%d_K%.1f.dat",L,K,L,K,f);
-  if((frg2_files=fopen(namerg2_files,"r"))==NULL)
+  //Archivo de configuración inicial = fase completamente plana
+  
+  sprintf(namein,"./RUNS/L%d/K%.1f/xpos%d_inicial.dat",L,K,L);
+  if((input=fopen(namein,"r"))==NULL)
     {
-      if(Rg2_files()==1)// Cálcula el rg2 para cada archivo de posicines
-	return 1;
+      printf("Error existencial: El archivo $s no existe\n",namein); 
+      return 0;
+    }      
+  i=0;      
+  while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
+    i++;
+  
+  fclose(input);     
+  if(i!=N)
+    {
+      printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
+      return 0;
     }
-  else
+  radio2gflat=radio_giraton();
+  
+  //Cálculo del espaciado medio entre nodos
+
+  sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-2999.dat",L,K,L,K);
+  if((input=fopen(namein,"r"))==NULL)
+    {
+      printf("Error existencial: El archivo $s no existe\n",namein); 
+      return 0;
+    }      
+  i=0;      
+  while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
+    i++;
+  
+  fclose(input);     
+  if(i!=N)
+    {
+      printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
+      return 0;
+    }
+
+  nlink=0;
+  sum_norma2=0.0F;
+  for(dir=0; dir<3; dir++)
+    {
+      for(s1=rombov1[dir].min.s1; s1<rombov1[dir].max.s1; s1++)
+	{
+	  for(s2=rombov1[dir].min.s2; s2<rombov1[dir].max.s2; s2++)
+	    {
+	      nlink++;
+	      i=s1+L*s2;
+	      _resta(r,x[v1[i][dir]],x[i]); 
+	      norma2=_norma2(r);
+	      sum_norma2+=norma2;
+	    }
+	}
+    }
+  a2=sum_norma2/(double) nlink;
+
+
+
+  //Lectura de lo archivos de posiciones resultantes de la simulación
+  f=0;
+  Radio2g[NF-1]=0.0F;
+  
+  sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
+  while((input=fopen(namein,"r"))!=NULL)
     {
       i=0;      
-      while(fscanf(frg2_files,"%lf %lf",&radio2g[i],&Radio2g[i])!=EOF)
+      while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
 	{
 	  i++;
 	}
-      fclose(frg2_files);     
-      if(i!=NF)
+      fclose(input);     
+      if(i!=N)
 	{
-	  printf("Error lineal: El fichero %s no contiene %d líneas\n",namerg2_files,NF);
-	  return 1;
-      	}
+	  printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
+	  return 0;
+	}
+      radio2g[f]=radio_giraton();
+      Radio2g[NF-1]+=radio2g[f];
+      Radio2g[f]=Radio2g[NF-1];
+      f++;
+      sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
     }
+  
+  if(f!=NF)
+    {
+      printf("Error lectura: El número de archivos leidos en ./RUNS/L%d/K%.1f/ no es %d\n",L,K,NF); 
+      return 0;
+    }
+
   //TERMALIZACION:
+
   sprintf(nametermal,"./MEDIDAS_Rg2/L%d/K%.1f/termalizacion_Rg2_L%d_K%.1f.dat",L,K,L,K);
   ftermal=fopen(nametermal,"w");
   printf("\n Plot: Termalización L=%d K=%.1f \n",L,K);
@@ -146,7 +239,10 @@ int main(void )
   fflush(pipegp);//vacía el buffer de la tubería gnuplot:
   //close(pipegp);
   
-  //Entrada del valor del índice del archivo en el que se produce  printf("\n Valor Rg2 configuración plana = %lf\n",radio2gflat);
+  //Entrada del valor del índice del archivo en el que se produce la termalización
+
+  printf("\n Valor Rg2 configuración plana = %lf\n",radio2gflat);
+  printf("Espaciado medio al cuadrdado= %lf \n",a2);  
   printf("\n Escribe el valor del índice del archivo correspondiente a la termalización=");
  
   while(scanf("%d",&indtermal)==0 || indtermal<0)
@@ -263,12 +359,12 @@ int main(void )
   printf("\n -> Rg2=%lf +- %lf\n", media_radio2g, error_radio2g);
 
   //Escribe el valor de la medida con su error en el archivo Medidas_Rg2
-  sprintf(namerg2_LK,"./MEDIDAS_Rg2/L%d/Medidas_Rg2_L%d.dat",L,L);
-  frg2_LK=fopen(namerg2_LK,"a");
-  fprintf(frg2_LK,"%lf %lf %lf %lf %d %d\n", K, media_radio2g, error_radio2g,radio2gflat,indtermal,nbloq);
-  close(frg2_LK);
+  sprintf(namerg2,"./MEDIDAS_Rg2/L%d/Medidas_Rg2_L%d.dat",L,L);
+  filerg2=fopen(namerg2,"a");
+  fprintf(filerg2,"%lf %lf %lf %lf %d %d\n", K, media_radio2g, error_radio2g,radio2gflat,indtermal,nbloq);
+  close(filerg2);
   close(pipegp);
-  return 0;
+  return 1;
 }
 
 double radio_giraton(void )
@@ -301,74 +397,92 @@ double radio_giraton(void )
   norma2xcm=_norma2(xcm);
   momento2=sum_norma2/ ((double) N);
 
-  return r2giraton=(momento2-norma2xcm)/3.0F;
+    return r2giraton=(momento2-norma2xcm)/3.0F;
+}
+int sigma_min(int si)
+{
+  int simin;
+
+  if(si<0)
+    simin=-si;
+  else
+    simin=0;
+  return simin;
 }
 
-int radio_giraton_inicial(void )
+int sigma_max(int si)
 {
+  int simax;
+
+  if(si>0)
+    simax=L-si;
+  else
+    simax=L;
+  return simax;
+}
+
+void indice_vecnos_prox()
+{
+  int s1,s2;
+  int s1min,s1max,s2min,s2max;
+  int dir;
+  int s1_dir,s2_dir,s1_old,s2_old;
   int i;
-  FILE *input;
-  char namein[255];
-
-  sprintf(namein,"./RUNS/L%d/K%.1f/xpos%d_inicial.dat",L,K,L);
-  if((input=fopen(namein,"r"))==NULL)
+  int vec_new,vec_old;
+  int ord;
+ 
+  for(s1_dir=1,s2_dir=0,dir=0; dir<6; dir++)
     {
-      printf("Error existencial: El archivo $s no existe\n",namein); 
-      return 1;
-    }      
-  i=0;      
-  while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
-    i++;
+      basev1[dir].s1=s1_dir;
+      basev1[dir].s2=s2_dir;
+      
+      s1_old=s1_dir;
+      s2_old=s2_dir;
+      
+      s1_dir=-s2_old;
+      s2_dir= s1_old + s2_old;
+    }
   
-  fclose(input);     
-  if(i!=N)
+  for(dir=0; dir<6; dir++)
     {
-      printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
-      return 1;
+      rombov1[dir].min.s1=sigma_min(basev1[dir].s1);
+      rombov1[dir].max.s1=sigma_max(basev1[dir].s1);
+      rombov1[dir].min.s2=sigma_min(basev1[dir].s2);
+      rombov1[dir].max.s2=sigma_max(basev1[dir].s2);
     }
-  radio2gflat=radio_giraton();
-  return 0;
-}
-int Rg2_files(void )
-{
-  int f,i;
-  FILE *input;
-  FILE *output;
-  char namein[255];
-  char nameout[255];
 
-  f=0;
-  Radio2g[NF-1]=0.0F;
-  
-  sprintf(nameout,"./MEDIDAS_Rg2/L%d/K%.1f/rg2_L%d_K%.1f.dat",L,K,L,K,f);
-  output=fopen(nameout,"w");
-  sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
-  while((input=fopen(namein,"r"))!=NULL)
+  // Cálculo de v1[N][6],zv1[N]
+
+  for(s2=0; s2<L; s2++)
     {
-      i=0;      
-      while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
+      for(s1=0; s1<L; s1++)
 	{
-	  i++;
+	  i=s1+L*s2;
+	  vec_old=NO;
+	  zv1[i]=0;
+	  dirv1_ini[i]=0;
+	  dirv1_fin[i]=0;
+	  for(dir=0; dir<6; dir++)
+	    {
+	      if(s1>=rombov1[dir].min.s1 && s1<rombov1[dir].max.s1 && s2>=rombov1[dir].min.s2 && s2<rombov1[dir].max.s2)
+		{
+		  v1[i][dir] = i + basev1[dir].s1 + L * basev1[dir].s2;
+		  zv1[i]+=1;
+		  vec_new=SI;
+		}
+	      else
+		{
+		  v1[i][dir]=-1;
+		  vec_new=NO;
+		}
+	      if(vec_old-vec_new<0)
+		dirv1_ini[i]=dir;
+	      if(vec_old-vec_new>0)
+		dirv1_fin[i]=dir-1;
+	      vec_old=vec_new; 
+	    }
+	  if(vec_old==SI && v1[i][0]==-1)//Comparamos dir 0 con dir 5
+		dirv1_fin[i]=5;
 	}
-      fclose(input);     
-      if(i!=N)
-	{
-	  printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
-	  return 1;
-	}
-      radio2g[f]=radio_giraton();
-      Radio2g[NF-1]+=radio2g[f];
-      Radio2g[f]=Radio2g[NF-1];
-      // Escribimos los resultados en un archivo
-      fprintf(output,"%lf %lf\n",radio2g[f],Radio2g[f]);
-      f++;
-      sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
     }
-  fclose(output);
-  if(f!=NF)
-    {
-      printf("Error lectura: El número de archivos leidos en ./RUNS/L%d/K%.1f/ no es %d\n",L,K,NF); 
-      return 1;
-    }
-  return 0;
 }
