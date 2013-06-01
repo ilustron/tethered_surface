@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 
-double radio_giraton(void);
+
+double energia_gauss(void );
 
 void indice_vecnos_prox();
 
@@ -60,34 +61,28 @@ int main(void )
   FILE *input;// -> Archivo de lectura = Posiciones 3d de los nodos  
   FILE *ftermal;// -> Archivo de escritura = Termalización
   FILE *ferror;// -> Archivo de escritura = Error vs. Tamaño del bloque Jacknife 
-  FILE *filerg2;// -> Archivo de escritura = Valores Rg2 con errores
+  FILE *filegauss;// -> Archivo de escritura = Valores Rg2 con errores
   FILE *pipegp = popen("gnuplot -persist","w");//Tubería a gnuplot (gráficas)  
   
   char namein[255];
   char nametermal[255];
   char nameerror[255];
-  char namerg2[255];
+  char namegauss[255];
 
   //OBSERVABLES
-  double radio2gflat;//Observable fase completamente plana
-  double radio2g[NF];//observable 
-  double Radio2g[NF];//valor acumulado  
-  double media_radio2g;// media del radio del giraton al cuadrado
-  double Radio2gref;//valor de referencia necesario para redefinir los observables
 
-  //ESPACIADO
+  double egauss[NF];//observable 
+  double Egauss[NF];//valor acumulado  
+  double media_egauss;// media del radio del giraton al cuadrado
+  double Egaussref;//valor de referencia necesario para redefinir los observables
 
-  int nlink,s1,s2,dir;
-  double norma2,sum_norma2,a2;
-  vector r;
-  
   //Valores bloque Jacknife
 
-  double radio2gJK[NF];
-  double sumJK_radio2g;
+  double egaussJK[NF];
+  double sumJK_egauss;
 
   //Errores
-  double error_radio2g;
+  double error_egauss;
 
   int i,k,f,b,n;
   int indtermal;
@@ -99,68 +94,9 @@ int main(void )
 
   // LECTURA ARCHIVOS FUENTE (Correspondientes a las posiciones de los nodos de la membrana)
 
-  //Archivo de configuración inicial = fase completamente plana
-  
-  sprintf(namein,"./RUNS/L%d/K%.1f/xpos%d_inicial.dat",L,K,L);
-  if((input=fopen(namein,"r"))==NULL)
-    {
-      printf("Error existencial: El archivo $s no existe\n",namein); 
-      return 0;
-    }      
-  i=0;      
-  while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
-    i++;
-  
-  fclose(input);     
-  if(i!=N)
-    {
-      printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
-      return 0;
-    }
-  radio2gflat=radio_giraton();
-  
-  //Cálculo del espaciado medio entre nodos
-
-  sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-2999.dat",L,K,L,K);
-  if((input=fopen(namein,"r"))==NULL)
-    {
-      printf("Error existencial: El archivo $s no existe\n",namein); 
-      return 0;
-    }      
-  i=0;      
-  while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
-    i++;
-  
-  fclose(input);     
-  if(i!=N)
-    {
-      printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
-      return 0;
-    }
-
-  nlink=0;
-  sum_norma2=0.0F;
-  for(dir=0; dir<3; dir++)
-    {
-      for(s1=rombov1[dir].min.s1; s1<rombov1[dir].max.s1; s1++)
-	{
-	  for(s2=rombov1[dir].min.s2; s2<rombov1[dir].max.s2; s2++)
-	    {
-	      nlink++;
-	      i=s1+L*s2;
-	      _resta(r,x[v1[i][dir]],x[i]); 
-	      norma2=_norma2(r);
-	      sum_norma2+=norma2;
-	    }
-	}
-    }
-  a2=sum_norma2/(double) nlink;
-
-
-
   //Lectura de lo archivos de posiciones resultantes de la simulación
   f=0;
-  Radio2g[NF-1]=0.0F;
+  Egauss[NF-1]=0.0F;
   
   sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
   while((input=fopen(namein,"r"))!=NULL)
@@ -176,9 +112,9 @@ int main(void )
 	  printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
 	  return 0;
 	}
-      radio2g[f]=radio_giraton();
-      Radio2g[NF-1]+=radio2g[f];
-      Radio2g[f]=Radio2g[NF-1];
+      egauss[f]=energia_gauss();
+      Egauss[NF-1]+=egauss[f];
+      Egauss[f]=Egauss[NF-1];
       f++;
       sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
     }
@@ -191,25 +127,25 @@ int main(void )
 
   //TERMALIZACION:
 
-  sprintf(nametermal,"./MEDIDAS_Rg2/L%d/K%.1f/termalizacion_Rg2_L%d_K%.1f.dat",L,K,L,K);
+  sprintf(nametermal,"./MEDIDAS_Egauss/L%d/K%.1f/termalizacion_Egauss_L%d_K%.1f.dat",L,K,L,K);
   ftermal=fopen(nametermal,"w");
   printf("\n Plot: Termalización L=%d K=%.1f \n",L,K);
   printf(" X=1/(nº archivos conservados)\n");
-  printf(" Y=promedio del radio del giratón al cuadrado\n");
+  printf(" Y=promedio de la energía elástica\n");
   printf(" Ind.=índice del primer archivo conservado \n");
   printf("\n Ind. X  Y\n");
   for(f=1; f<NF; f++)
     {      
       if((f%10)==0)
       {
-	      media_radio2g=(Radio2g[NF-1]-Radio2g[NF-f-1])/(double) f;
-	      fprintf(ftermal,"%lf %lf\n",1.0F/(double) f,media_radio2g);
-	      printf(" %d %lf %lf\n",NF-f,1.0F/(double) f,media_radio2g);
+	      media_egauss=(Egauss[NF-1]-Egauss[NF-f-1])/(double) f;
+	      fprintf(ftermal,"%lf %lf\n",1.0F/(double) f,media_egauss);
+	      printf(" %d %lf %lf\n",NF-f,1.0F/(double) f,media_egauss);
       }
     }
-  media_radio2g=Radio2g[NF-1]/(double)NF;
-  fprintf(ftermal,"%lf %lf\n",1.0F/(double)NF,media_radio2g);
-  printf(" %d %lf %lf\n",0,1.0F/(double) f,media_radio2g);
+  media_egauss=Egauss[NF-1]/(double)NF;
+  fprintf(ftermal,"%lf %lf\n",1.0F/(double)NF,media_egauss);
+  printf(" %d %lf %lf\n",0,1.0F/(double) f,media_egauss);
   fclose(ftermal);
 
   //GRÁFICA GNUPLOT TERMALIZACION:
@@ -218,7 +154,7 @@ int main(void )
 
   //Guarda el gráfico en formato latex en el disco:
   fprintf(pipegp,"set terminal epslatex color colortext\n");
-  fprintf(pipegp,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/Plottermal_Rg2-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp,"set output \"./MEDIDAS_Egauss/L%d/K%.1f/Plottermal_Egauss-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
   fprintf(pipegp, "set title \' Gráfico Termalización ($L=%d$ $K=%.1f$) \' \n",L,K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel \'1/ (n\\textdegree de archivos conservados)\' \n");
@@ -241,8 +177,6 @@ int main(void )
   
   //Entrada del valor del índice del archivo en el que se produce la termalización
 
-  printf("\n Valor Rg2 configuración plana = %lf\n",radio2gflat);
-  printf("Espaciado medio al cuadrdado= %lf \n",a2);  
   printf("\n Escribe el valor del índice del archivo correspondiente a la termalización=");
  
   while(scanf("%d",&indtermal)==0 || indtermal<0)
@@ -254,19 +188,19 @@ int main(void )
   fmax=NF-indtermal;//fmax es ahora el nº total de archivos para los cálculos
   if(fmax!=NF)
     {
-      Radio2gref=Radio2g[indtermal-1];
+      Egaussref=Egauss[indtermal-1];
       for(f=0; f<fmax; f++)//redefinimos los observables
 	{
-	  Radio2g[f]=Radio2g[f+indtermal]-Radio2gref;
+	  Egauss[f]=Egauss[f+indtermal]-Egaussref;
 	}   
-      media_radio2g=Radio2g[fmax-1]/(double)fmax;
+      media_egauss=Egauss[fmax-1]/(double)fmax;
     }
 
-  printf("\n -> Media rg2= %lf\n",media_radio2g);
+  printf("\n -> Media rg2= %lf\n",media_egauss);
       
   // Error en función del nº de bloques
 
-  sprintf(nameerror,"./MEDIDAS_Rg2/L%d/K%.1f/error_Rg2_L%d_K%d.dat",L,K,L,K);
+  sprintf(nameerror,"./MEDIDAS_Egauss/L%d/K%.1f/error_Egauss_L%d_K%d.dat",L,K,L,K);
   ferror=fopen(nameerror,"w");
   printf("\n Plot: Error vs. tamaño bloque Jacknife L=%d K=%.1f \n",L,K);
   printf(" X=tamaño del bloque Jacknife\n");
@@ -278,24 +212,24 @@ int main(void )
       if((fmax%b)==0)
 	{
 	  n=fmax/b;
-	  error_radio2g=0.0F;
+	  error_egauss=0.0F;
 
-	  radio2gJK[0]=Radio2g[n-1];
+	  egaussJK[0]=Egauss[n-1];
 
-	  sumJK_radio2g=(Radio2g[fmax-1]-radio2gJK[0])/(double)(fmax-n);
-	  error_radio2g+=pow(sumJK_radio2g-media_radio2g,2.0);
+	  sumJK_egauss=(Egauss[fmax-1]-egaussJK[0])/(double)(fmax-n);
+	  error_egauss+=pow(sumJK_egauss-media_egauss,2.0);
 	  
 	  for (k=1; k<b; k++)
 	    {
-	      radio2gJK[k]=Radio2g[(k+1)*n-1]-Radio2g[k*n-1];
-	      sumJK_radio2g=(Radio2g[fmax-1]-radio2gJK[k])/(double)(fmax-n);
-	      error_radio2g+=pow(sumJK_radio2g-media_radio2g,2.0);
+	      egaussJK[k]=Egauss[(k+1)*n-1]-Egauss[k*n-1];
+	      sumJK_egauss=(Egauss[fmax-1]-egaussJK[k])/(double)(fmax-n);
+	      error_egauss+=pow(sumJK_egauss-media_egauss,2.0);
 	    }
 
-	  error_radio2g=(double)(b-1)/((double) b) * error_radio2g;
-	  error_radio2g=sqrt(error_radio2g);
-	  fprintf(ferror,"%d %lf\n",n,error_radio2g);  
-	  printf(" %d %lf\n",n,error_radio2g);  
+	  error_egauss=(double)(b-1)/((double) b) * error_egauss;
+	  error_egauss=sqrt(error_egauss);
+	  fprintf(ferror,"%d %lf\n",n,error_egauss);  
+	  printf(" %d %lf\n",n,error_egauss);  
 	}
     }
   fclose(ferror);
@@ -306,12 +240,12 @@ int main(void )
 
   //Guardamos el gráfico en formato latex en el disco:
   fprintf(pipegp,"set terminal epslatex color colortext\n");
-  fprintf(pipegp,"set output \"./MEDIDAS_Rg2/L%d/K%.1f/Ploterror_Rg2-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp,"set output \"./MEDIDAS_Egauss/L%d/K%.1f/Ploterror_Egauss-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
   fprintf(pipegp, "set title \' Error vs Tamaño Jacknife ($L=%d$ $K=%.1f$) \' \n",L,K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel \'Tamaño del bloque Jacknife (sweeps/$\\tau_0$)\' \n");
-  fprintf(pipegp, "set ylabel \' Error $R^2_g$ \'\n");
-  fprintf(pipegp, "plot \"%s\" title \'Error $R_g^2$\' w lp\n",nameerror);
+  fprintf(pipegp, "set ylabel \' Error $E_g$ \'\n");
+  fprintf(pipegp, "plot \"%s\" title \'Error $E_g$\' w lp\n",nameerror);
 
   //Vuelve a la anterior terminal gnuplot:
   fprintf(pipegp,"set output\n");
@@ -321,8 +255,8 @@ int main(void )
   fprintf(pipegp, "set title \" Error vs. tamaño del bloque Jacknife L=%d K=%.1f\" \n",L, K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel\" tamaño del bloque Jacknife (sweeps/tau)\"\n");
-  fprintf(pipegp, "set ylabel\"Error radio2g \"\n");  
-  fprintf(pipegp, "plot \"%s\" title \"Radio2g\" w lp\n",nameerror);
+  fprintf(pipegp, "set ylabel\"Error energía elástica \"\n");  
+  fprintf(pipegp, "plot \"%s\" title \"E. elástica\" w lp\n",nameerror);
 
 
   //Vacía el buffer de la tubería gnuplot y se cierra:
@@ -330,7 +264,7 @@ int main(void )
   //close(pipegp);
 
   
-  // Radio del giratón vs. Valor del error:
+  // Radio de la energía elástica vs. Valor del error:
 
   printf("\n Escribe el tamaño del bloque Jacknife en donde se estabiliza el error=");  
   while(scanf("%d",&nbloq)==0 || nbloq<0)
@@ -342,7 +276,7 @@ int main(void )
   ferror=fopen(nameerror,"r");//Abrimos el archivo de errores para lectura
   while(nbloq!=n)
     {
-      if(fscanf(ferror,"%d %lf",&n,&error_radio2g)==EOF)
+      if(fscanf(ferror,"%d %lf",&n,&error_egauss)==EOF)
 	{
 	  close(ferror);
 	  printf("\n Debe ser un número válido de elementos del bloque Jacknife=");  
@@ -356,49 +290,41 @@ int main(void )
     }
   close(ferror);
 
-  printf("\n -> Rg2=%lf +- %lf\n", media_radio2g, error_radio2g);
+  printf("\n -> Rg2=%lf +- %lf\n", media_egauss, error_egauss);
 
   //Escribe el valor de la medida con su error en el archivo Medidas_Rg2
-  sprintf(namerg2,"./MEDIDAS_Rg2/L%d/Medidas_Rg2_L%d.dat",L,L);
-  filerg2=fopen(namerg2,"a");
-  fprintf(filerg2,"%lf %lf %lf %lf %d %d\n", K, media_radio2g, error_radio2g,radio2gflat,indtermal,nbloq);
-  close(filerg2);
+  sprintf(namegauss,"./MEDIDAS_Egauss/L%d/Medidas_Egauss_L%d.dat",L,L);
+  filegauss=fopen(namegauss,"a");
+  fprintf(filegauss,"%lf %lf %lf %d %d\n", K, media_egauss, error_egauss,indtermal,nbloq);
+  close(filegauss);
   close(pipegp);
   return 1;
 }
 
-double radio_giraton(void )
+double energia_gauss(void )
 {
-  int i;
-  double sum_norma2,norma2,norma2sumx,norma2xcm;
-  double densidad,momento2,r2giraton;
-  vector sum_x,xcm;
-  
 
-  sum_norma2=0.0F; 
+  int dir,s1,s2,i;
+  double norma2,sum_norma2,egauss;
+  vector r;
 
-  sum_x.a=0.0F;
-  sum_x.b=0.0F;  
-  sum_x.c=0.0F;
-
-  norma2=0.0F;
-
-  for(i=0; i<N; i++)
+  sum_norma2=0.0F;
+  for(dir=0; dir<3; dir++)
     {
-      norma2=_norma2(x[i]);
-      _suma(sum_x,sum_x,x[i]);
-      sum_norma2+=norma2;      
+      for(s1=rombov1[dir].min.s1; s1<rombov1[dir].max.s1; s1++)
+	{
+	  for(s2=rombov1[dir].min.s2; s2<rombov1[dir].max.s2; s2++)
+	    {
+	      i=s1+L*s2;
+	      _resta(r,x[v1[i][dir]],x[i]); 
+	      norma2=_norma2(r);
+	      sum_norma2+=norma2;
+	    }
+	}
     }
-  
-  densidad=1.0F/ ((double) N);
-  
-  xcm=sum_x;
-  _escala(xcm,densidad);   
-  norma2xcm=_norma2(xcm);
-  momento2=sum_norma2/ ((double) N);
-
-    return r2giraton=(momento2-norma2xcm)/3.0F;
+  return egauss=sum_norma2;
 }
+
 int sigma_min(int si)
 {
   int simin;

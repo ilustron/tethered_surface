@@ -20,11 +20,14 @@ do
 	gcc -O2 -DK=$k -DL=$l -DNF=$f medida_Rg2.c -lm -o medida_Rg2.out
 	./medida_Rg2.out
         #Pasar a pdf los eps resultantes
-	echo Convirtiendo Ploterror_Rg2-L$l-K$i.eps a .pdf
-	epstopdf ./MEDIDAS_Rg2/L$l/K$k/Ploterror_Rg2-L$l-K$i.eps
+	echo Convirtiendo Phistorico_Rg2-L$l-K$i.eps a .pdf
+	epstopdf ./MEDIDAS_Rg2/L$l/K$k/Phistorico_Rg2-L$l-K$i.eps
+	echo Hecho
+	echo Convirtiendo Pterror_Rg2-L$l-K$i.eps a .pdf
+	epstopdf ./MEDIDAS_Rg2/L$l/K$k/Perror_Rg2-L$l-K$i.eps
 	echo Hecho
 	echo Convirtiendo Plotermal_Rg2-L$l-K$i.eps a .pdf
-	epstopdf ./MEDIDAS_Rg2/L$l/K$k/Plottermal_Rg2-L$l-K$i.eps
+	epstopdf ./MEDIDAS_Rg2/L$l/K$k/Plogtermal_Rg2-L$l-K$i.eps
 	echo Hecho
     done
     
