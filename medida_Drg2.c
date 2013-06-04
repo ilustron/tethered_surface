@@ -1,9 +1,12 @@
+ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
+double radio_giraton(void);
+
+
 double energia_curvatura(void);
-int energia_curvatura_inicial(void);
 void indice_vecnos_prox();
 
 int sigma_min(int );
@@ -13,7 +16,7 @@ int index_plqta_dir0(int i);
 int index_plqta_dir1(int i);
 int index_plqta_prox(int i, int dir);
 
-int Se_file(void);
+int Drg2_file(void);
 void plot_historico(void);
 void plot_termalizacion(void);
 void error_Jacknife(int );
@@ -68,15 +71,22 @@ int p[N][6]; // Indices de las plaquetas vecinas
 
 double se[NF];// Energía de curvatura correspondiente a cada configuración
 double Se[NF];// Valor acumulado de la energía de curvatura 
-double media_se;// media 
-double error_se;
 
+double rg2[NF];//observable 
+double Rg2[NF];//valor acumulado  
+
+
+double rg2se[NF];
+double Rg2Se[NF];
+
+double drg2;
+double error_drg2;
 int main(void )
 {
   FILE *input;
   FILE *output;
 
-  char sedata[255];
+  char drg2data[255];
   char namein[255];
   char nameout[255];
 
@@ -97,23 +107,23 @@ int main(void )
     }
 
   //MEDIDA/LECTURA del Radio del giratón al para cada configuración:
-  sprintf(sedata,"./MEDIDAS_Se/L%d/K%.1f/Se_L%d_K%.1f.dat",L,K,L,K);
-  if((input=fopen(sedata,"r"))==NULL)
+  sprintf(drg2data,"./MEDIDAS_Drg2/L%d/K%.1f/Drg2_L%d_K%.1f.dat",L,K,L,K);
+  if((input=fopen(drg2data,"r"))==NULL)
     {
-      if(Se_file()==1)// Cálcula la E curvatura para cada archivo de posicines
+      if(Drg2_file()==1)// 
 	return 1;
     }
   else
     {
       i=0;      
-      while(fscanf(input,"%lf %lf",&se[i],&Se[i])!=EOF)
+      while(fscanf(input,"%lf %lf",&rg2[i],&Rg2[i],&se[i],&Se[i],&rg2se[i],&Rg2Se[i],&drg2)!=EOF)
 	{
 	  i++;
 	}
       fclose(input);     
       if(i!=NF)
 	{
-	  printf("Error lineal: El fichero %s no contiene %d líneas\n",sedata,NF);
+	  printf("Error lineal: El fichero %s no contiene %d líneas\n",drg2data,NF);
 	  return 1;
       	}
     }
@@ -142,13 +152,13 @@ int main(void )
       while (getchar()!= '\n');// para leer un único dato por línea
       printf("\n Debe ser un número entero positivo="); 
     } 
-  sprintf(namein,"./MEDIDAS_Se/L%d/K%.1f/error_Se_L%d_K%.1f.dat",L,K,L,K); //Abrimos el archivo de errores para lectura
+  sprintf(namein,"./MEDIDAS_Drg2/L%d/K%.1f/error_Drg2_L%d_K%.1f.dat",L,K,L,K); //Abrimos el archivo de errores para lectura
 
   input=fopen(namein,"r");
   n=0;
   while(nbloq!=n)
     {
-      if(fscanf(input,"%d %lf",&n,&error_se)==EOF)
+      if(fscanf(input,"%d %lf",&n,&error_drg2)==EOF)
 	{
 	  close(input);
 	  printf("\n Debe ser un número válido de elementos del bloque Jacknife=");  
@@ -161,14 +171,46 @@ int main(void )
 	}
     }
   close(input);
-  printf("\n -> Se=%lf +- %lf\n", media_se, error_se);
+  printf("\n -> Drg2=%lf +- %lf\n", drg2, error_drg2);
 
  //ESCRITURA RESULTADOS: 
-  sprintf(nameout,"./MEDIDAS_Se/L%d/Medidas_Se_L%d.dat",L,L);
+  sprintf(nameout,"./MEDIDAS_Drg2/L%d/Medidas_Drg2_L%d.dat",L,L);
   output=fopen(nameout,"a");
-  fprintf(output,"%lf %lf %lf %d %d\n", K, media_se, error_se,NF-indtermal,nbloq);
+  fprintf(output,"%lf %lf %lf %d %d\n", K, drg2, error_drg2,NF-indtermal,nbloq);
   close(output);
   return 0;
+}
+double radio_giraton(void )
+{
+  int i;
+  double sum_norma2,norma2,norma2sumx,norma2xcm;
+  double densidad,momento2,r2giraton;
+  vector sum_x,xcm;
+  
+
+  sum_norma2=0.0F; 
+
+  sum_x.a=0.0F;
+  sum_x.b=0.0F;  
+  sum_x.c=0.0F;
+
+  norma2=0.0F;
+
+  for(i=0; i<N; i++)
+    {
+      norma2=_norma2(x[i]);
+      _suma(sum_x,sum_x,x[i]);
+      sum_norma2+=norma2;      
+    }
+  
+  densidad=1.0F/ ((double) N);
+  
+  xcm=sum_x;
+  _escala(xcm,densidad);   
+  norma2xcm=_norma2(xcm);
+  momento2=sum_norma2/ ((double) N);
+
+  return r2giraton=(momento2-norma2xcm)/3.0F;
 }
 
 double energia_curvatura(void)
@@ -426,7 +468,7 @@ int index_plqta_prox(int i, int dir)
     }
   return p;
 }
-int Se_file(void )
+int Drg2_file(void )
 {
   int f,i;
   FILE *input;
@@ -436,7 +478,9 @@ int Se_file(void )
 
   f=0;
   Se[NF-1]=0.0F;
-  sprintf(nameout,"./MEDIDAS_Se/L%d/K%.1f/Se_L%d_K%.1f.dat",L,K,L,K);
+  Rg2[NF-1]=0.0F;
+  Rg2Se[NF-1]=0.0F;
+  sprintf(nameout,"./MEDIDAS_Drg2/L%d/K%.1f/Drg2_L%d_K%.1f.dat",L,K,L,K);
   output=fopen(nameout,"w");
   sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
   while((input=fopen(namein,"r"))!=NULL)
@@ -454,8 +498,19 @@ int Se_file(void )
       se[f]=energia_curvatura();
       Se[NF-1]+=se[f];
       Se[f]=Se[NF-1];
+
+      rg2[f]=radio_giraton();
+      Rg2[NF-1]+=rg2[f];
+      Rg2[f]=Rg2[NF-1];
+
+      rg2se[f]=rg2[f]*se[f];
+      Rg2Se[NF-1]+=rg2se[f];
+      Rg2Se[f]=Rg2Se[NF-1];
+
+      drg2=Rg2Se[f]/(double)(f+1)-Se[f]*Rg2[f]/(double)(f+1)/(double)(f+1);
+
       // Escribimos los resultados en el archivo
-      fprintf(output,"%lf %lf\n",se[f],Se[f]);
+      fprintf(output,"%lf %lf %lf %lf %lf %lf %lf\n",rg2[f],Rg2[f],se[f],Se[f],rg2se[f],Rg2Se[f],drg2);
       f++;
       sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
     }
@@ -472,13 +527,13 @@ void plot_historico(void )
   FILE *pipegp = popen("gnuplot -persist","w");// Tubería a gnuplot (gráficas)  
   char nameout[255];
 
-  sprintf(nameout,"./MEDIDAS_Se/L%d/K%.1f/Se_L%d_K%.1f.dat",L,K,L,K);
+  sprintf(nameout,"./MEDIDAS_Drg2/L%d/K%.1f/Drg2_L%d_K%.1f.dat",L,K,L,K);
   fprintf(pipegp,"set terminal qt 1\n");//Guarda la terminal gp por defecto
   fprintf(pipegp,"set terminal push\n");//Guarda la terminal gp por defecto
 
   //Guarda el gráfico en formato latex en el disco:
   fprintf(pipegp,"set terminal epslatex color colortext\n");
-  fprintf(pipegp,"set output \"./MEDIDAS_Se/L%d/K%.1f/Phistorico_Se-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp,"set output \"./MEDIDAS_Drg2/L%d/K%.1f/Phistorico_Drg2-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
   fprintf(pipegp, "set title \' Histórico medidas ($L=%d$ $K=%.1f$) \' \n",L,K);
   fprintf(pipegp, "set xlabel \'Sweeps\' \n");
   fprintf(pipegp, "set ylabel \' $\\langle S_e \\rangle$ \'\n");
@@ -491,8 +546,8 @@ void plot_historico(void )
   //gráfico en pantalla:
   fprintf(pipegp, "set title \" Histórico medidas L=%d K=%.1f\" \n",L,K);
   fprintf(pipegp, "set xlabel\" Sweeps\"\n");
-  fprintf(pipegp, "set ylabel\" Se \"\n");
-  fprintf(pipegp, "plot \"%s\"  u 1 title \"Se\" w lp \n",nameout);
+  fprintf(pipegp, "set ylabel\" Drg2 \"\n");
+  fprintf(pipegp, "plot \"%s\"  u 7 title \"Drg2\" w lp \n",nameout);
     
   fflush(pipegp);//vacía el buffer de la tubería gnuplot:
   close(pipegp); 
@@ -500,13 +555,13 @@ void plot_historico(void )
 void plot_termalizacion(void)
 {
   int f;
-  double media;
+  double media_se,media_rg2,media_drg2;
   FILE *pipegp = popen("gnuplot -persist","w");// Tubería a gnuplot (gráficas)  
   FILE *output;
   
   char nameout[255];
 
-  sprintf(nameout,"./MEDIDAS_Se/L%d/K%.1f/logtermal_Se_L%d_K%.1f.dat",L,K,L,K);
+  sprintf(nameout,"./MEDIDAS_Drg2/L%d/K%.1f/logtermal_Drg2_L%d_K%.1f.dat",L,K,L,K);
   output=fopen(nameout,"w");
   printf("\n Plot: Termalización L=%d K=%.1f \n",L,K);
   printf(" X=1/(nº archivos conservados)\n");
@@ -517,14 +572,19 @@ void plot_termalizacion(void)
     {      
       if((NF%f)==0)
       {
-	      media=(Se[NF-1]-Se[NF-f-1])/(double) f;
-	      fprintf(output,"%lf %lf\n",1.0F/(double) f,media);
-	      printf(" %d %lf %lf\n",NF-f,1.0F/(double) f,media);
+	media_se=(Se[NF-1]-Se[NF-f-1])/(double) f;
+	media_rg2=(Rg2[NF-1]-Rg2[NF-f-1])/(double) f;
+	media_drg2=(Rg2Se[NF-1]-Rg2Se[NF-f-1])/(double)f-media_se*media_rg2;
+	fprintf(output,"%lf %lf\n",1.0F/(double) f,media_drg2);
+	printf(" %d %lf %lf\n",NF-f,1.0F/(double) f,media_drg2);
       }
     }
-  media=Se[NF-1]/(double)NF;
-  fprintf(output,"%lf %lf\n",1.0F/(double)NF,media);
-  printf(" %d %lf %lf\n",0,1.0F/(double) f,media);
+
+  media_se=Se[NF-1]/(double)NF;
+  media_rg2=Rg2[NF-1]/(double) NF;
+  media_drg2=Rg2Se[NF-1]/(double)NF-media_se*media_rg2;
+  fprintf(output,"%lf %lf\n",1.0F/(double)NF,media_drg2);
+  printf(" %d %lf %lf\n",0,1.0F/(double) f,media_drg2);
   fclose(output);
 
   //GRÁFICA GNUPLOT TERMALIZACION:
@@ -534,12 +594,12 @@ void plot_termalizacion(void)
 
   //Guarda el gráfico en formato latex en el disco:
   fprintf(pipegp,"set terminal epslatex color colortext\n");
-  fprintf(pipegp,"set output \"./MEDIDAS_Se/L%d/K%.1f/Plogtermal_Se-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp,"set output \"./MEDIDAS_Drg2/L%d/K%.1f/Plogtermal_Drg2-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
   fprintf(pipegp, "set title \' Gráfico Termalización ($L=%d$ $K=%.1f$) \' \n",L,K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel \'1/ (n\\textdegree de archivos conservados)\' \n");
-  fprintf(pipegp, "set ylabel \' $\\langle S_e \\rangle$ \'\n");
-  fprintf(pipegp, "plot \"%s\" title \'$S_e$\' w lp\n",nameout);
+  fprintf(pipegp, "set ylabel \' $\\langle drg2 \\rangle$ \'\n");
+  fprintf(pipegp, "plot \"%s\" title \'$DR^2_g$\' w lp\n",nameout);
   
   //vuelve a la anterior terminal gnuplot:
   fprintf(pipegp,"set output\n");
@@ -549,22 +609,38 @@ void plot_termalizacion(void)
   fprintf(pipegp, "set title \" Termalización L=%d K=%.1f\" \n",L,K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n");
-  fprintf(pipegp, "set ylabel\" promedio Se \"\n");
-  fprintf(pipegp, "plot \"%s\" title \"Se\" w lp\n",nameout);
+  fprintf(pipegp, "set ylabel\" promedio Drg2 \"\n");
+  fprintf(pipegp, "plot \"%s\" title \"Drg2\" w lp\n",nameout);
     
   fflush(pipegp);//vacía el buffer de la tubería gnuplot:
   close(pipegp);
 }
 void error_Jacknife(int index)
 {
+
   int b,n,f,k;
   int fmax;
 
   double seJK[NF];
   double sumJK_se;
 
+  double rg2JK[NF];
+  double sumJK_rg2;
+
+  double rg2seJK[NF];
+  double sumJK_rg2se;
+
+  double drg2JK;
+
+  double media_se;
+  double media_rg2;
+
   double Senew[NF];
+  double Rg2new[NF];
+  double Rg2Senew[NF];
   double Seref;
+  double Rg2ref;
+  double Rg2Seref;
 
   FILE *output;// Archivo de escritura = Error vs. Tamaño del bloque Jacknife 
   char nameout[255];
@@ -572,16 +648,22 @@ void error_Jacknife(int index)
   FILE *pipegp = popen("gnuplot -persist","w");// Tubería a gnuplot (gráficas)
 
   fmax=NF-index;//fmax es ahora el nº total de archivos para los cálculos
-  
+ 
   Seref=Se[index-1];
+  Rg2ref=Rg2[index-1];
+  Rg2Seref=Rg2Se[index-1];
+
   for(f=0; f<fmax; f++)
     {
       Senew[f]=Se[f+index]-Seref;
+      Rg2new[f]=Rg2[f+index]-Rg2ref;
+      Rg2Senew[f]=Rg2Se[f+index]-Rg2Seref;
     }   
   
   media_se=Senew[fmax-1]/(double)fmax;
-  
-  sprintf(nameout,"./MEDIDAS_Se/L%d/K%.1f/error_Se_L%d_K%.1f.dat",L,K,L,K);
+  media_rg2=Rg2new[fmax-1]/(double)fmax;
+  drg2=Rg2Senew[fmax-1]/(double)fmax-media_se*media_rg2;
+  sprintf(nameout,"./MEDIDAS_Drg2/L%d/K%.1f/error_Drg2_L%d_K%.1f.dat",L,K,L,K);
   output=fopen(nameout,"w");
   printf("\n Plot: Error vs. tamaño bloque Jacknife L=%d K=%.1f \n",L,K);
   printf(" X=tamaño del bloque Jacknife\n");
@@ -593,24 +675,37 @@ void error_Jacknife(int index)
       if((fmax%b)==0)
 	{
 	  n=fmax/b;
-	  error_se=0.0F;
+	  error_drg2=0.0F;
 
 	  seJK[0]=Senew[n-1];
+	  rg2JK[0]=Rg2new[n-1];
+	  rg2seJK[0]=Rg2Senew[n-1];
 
 	  sumJK_se=(Senew[fmax-1]-seJK[0])/(double)(fmax-n);
-	  error_se+=pow(sumJK_se-media_se,2.0);
+	  sumJK_rg2=(Rg2new[fmax-1]-rg2JK[0])/(double)(fmax-n);
+	  sumJK_rg2se=(Rg2Senew[fmax-1]-rg2seJK[0])/(double)(fmax-n);
+	  
+	  drg2JK=sumJK_rg2se-sumJK_se*sumJK_rg2;
+	  error_drg2+=pow(drg2-drg2JK,2.0);
 	  
 	  for (k=1; k<b; k++)
 	    {
 	      seJK[k]=Senew[(k+1)*n-1]-Senew[k*n-1];
+	      rg2JK[k]=Rg2new[(k+1)*n-1]-Rg2new[k*n-1];
+	      rg2seJK[k]=Rg2Senew[(k+1)*n-1]-Rg2Senew[k*n-1];
+
 	      sumJK_se=(Senew[fmax-1]-seJK[k])/(double)(fmax-n);
-	      error_se+=pow(sumJK_se-media_se,2.0);
+	      sumJK_rg2=(Rg2new[fmax-1]-rg2JK[k])/(double)(fmax-n);
+	      sumJK_rg2se=(Rg2Senew[fmax-1]-rg2seJK[k])/(double)(fmax-n);
+
+	      drg2JK=sumJK_rg2se-sumJK_se*sumJK_rg2;
+	      error_drg2+=pow(drg2-drg2JK,2.0);
 	    }
 
-	  error_se=(double)(b-1)/((double) b) * error_se;
-	  error_se=sqrt(error_se);
-	  fprintf(output,"%d %lf\n",n,error_se);  
-	  printf(" %d %lf\n",n,error_se);  
+	  error_drg2=(double)(b-1.0F)/((double) b) * error_drg2;
+	  error_drg2=sqrt(error_drg2);
+	  fprintf(output,"%d %lf\n",n,error_drg2); 
+	  printf(" %d %lf\n",n,error_drg2);  
 	}
     }
   fclose(output);
@@ -621,12 +716,12 @@ void error_Jacknife(int index)
 
   //Guardamos el gráfico en formato latex en el disco:
   fprintf(pipegp,"set terminal epslatex color colortext\n");
-  fprintf(pipegp,"set output \"./MEDIDAS_Se/L%d/K%.1f/Perror_Se-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp,"set output \"./MEDIDAS_Drg2/L%d/K%.1f/Perror_Drg2-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
   fprintf(pipegp, "set title \' Error vs Tamaño Jacknife ($L=%d$ $K=%.1f$) \' \n",L,K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel \'Tamaño del bloque Jacknife (sweeps/$\\tau_0$)\' \n");
-  fprintf(pipegp, "set ylabel \' Error $S_e$ \'\n");
-  fprintf(pipegp, "plot \"%s\" title \'Error $S_e$\' w lp\n",nameout);
+  fprintf(pipegp, "set ylabel \' Error $Drg2$ \'\n");
+  fprintf(pipegp, "plot \"%s\" title \'Error $Drg2$\' w lp\n",nameout);
 
   //Vuelve a la anterior terminal gnuplot:
   fprintf(pipegp,"set output\n");
@@ -636,8 +731,8 @@ void error_Jacknife(int index)
   fprintf(pipegp, "set title \" Error vs. tamaño del bloque Jacknife L=%d K=%.1f\" \n",L, K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel\" tamaño del bloque Jacknife (sweeps/tau)\"\n");
-  fprintf(pipegp, "set ylabel\"Error Se \"\n");  
-  fprintf(pipegp, "plot \"%s\" title \"Se\" w lp\n",nameout);
+  fprintf(pipegp, "set ylabel\"Error Drg2 \"\n");  
+  fprintf(pipegp, "plot \"%s\" title \"Drg2\" w lp\n",nameout);
 
 
   //Vacía el buffer de la tubería gnuplot y se cierra:

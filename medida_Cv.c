@@ -14,11 +14,15 @@ int index_plqta_dir0(int i);
 int index_plqta_dir1(int i);
 int index_plqta_prox(int i, int dir);
 
-//#define K=2.0 // O compilar con la opcion -DK=2.0 
-//#define L=16 // O compilar con la opción -DL=16 
+int Cv_file(void);
+
+void plot_historico(void);
+void plot_termalizacion(void);
+void error_Jacknife(int );
+
 #define N L*L 
 #define M 2*(L-1)*(L-1) 
-//#define NF=1000 // O compilar con la opción -DNF=1000 
+
 
 #define _prodesc(w,u) (w.a*u.a+w.b*u.b+w.c*u.c)
 
@@ -65,43 +69,25 @@ vector x[N]; // Vectores de posición de los nodos
 int v1[N][6]; // Indices de los nodos vecinos
 int p[N][6]; // Indices de las plaquetas vecinas
 
+double se[NF];//observable 
+double Se[NF];//valor acumulado  
+double Se2[NF];
+double media_se;// media del observable
+double cv;//calor especifico
+double error_cv;
+
 int main(void )
 {
   FILE *input;// -> Archivo de lectura = Posiciones 3d de los nodos 
-  FILE *ftermal;// -> Archivo de escritura = Termalización
-  FILE *ferror;// -> Archivo de escritura = Error vs. Tamaño del bloque Jacknife 
-  FILE *fileCv;// -> Archivo de escritura = Valores Rg2 con errores
-  FILE *pipegp = popen("gnuplot -persist","w");//Tubería a gnuplot (gráficas)
-
-  char namein[255];
-  char nametermal[255];
-  char nameerror[255];
-  char nameCv[255];
-
-  //OBSERVABLES
-  double caloresp;//calor específico
-  double energia[NF];// Energía de curvatura correspondiente a cada configuración
-  double Energia[NF];// Valor acumulado de la energía de curvatura 
-  double media_energia;// media de la energia
-  double Energia2[NF];// Valor acumulado de la energía de curvatura al cuadradado
-
-  //Valores-bloque Jacknife
-  double energiaJK[NF];
-  double sumJK_energia;
-
-  double energia2JK[NF];
-  double sum2JK_energia;
+  FILE *output;// -> Archivo de escritura = Termalización
   
-  double calorespJK;
+  char cvdata[255];
+  char namein[255];
+  char nameout[255];
 
-  //Error
-  double error_caloresp;
-
-  int i,k,dir,f,b,n;
+  int i,k,dir,b,n;
 
   int indtermal;
-  int fmax;
-
   int nbloq;
 
   //TOPOLOGÍA:
@@ -116,228 +102,79 @@ int main(void )
 	}
     }
  
-
-  // LECTURA ARCHIVOS FUENTE (Correspondientes a las posiciones de los nodos de la membrana)
- 
-  f=0;
-  Energia[NF-1]=0.0F;
-  
-  sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
-  while((input=fopen(namein,"r"))!=NULL)
+  // MEDIDA/LECTURA del Radio del giratón al para cada configuración:
+  sprintf(cvdata,"./MEDIDAS_Cv/L%d/K%.1f/Cv_L%d_K%.1f.dat",L,K,L,K);
+  if((input=fopen(cvdata,"r"))==NULL)
+    {
+      if(Cv_file()==1)// Cálcula Cv para cada archivo de posicines
+	return 1;
+    }
+  else
     {
       i=0;      
-      while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
-	i++;
-
-      fclose(input);     
-      if(i!=N)
+      while(fscanf(input,"%lf %lf %lf %lf",&se[i],&Se[i],&Se2[i],&cv)!=EOF)
 	{
-	  printf("Error: El fichero %s no contiene %d líneas\n",namein,N);
-	  return 0;
+	  i++;
 	}
-      energia[f]=energia_curvatura();
-      Energia[NF-1]+=energia[f];
-      Energia[f]=Energia[NF-1];
-
-      Energia2[NF-1]+=(energia[f]*energia[f]);
-      Energia2[f]=Energia2[NF-1];
-      f++;
-      sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
-    }
-  
-  if(f!=NF)
-    {
-      printf("Error:El número de archivos leidos en ./RUNS/L%d/K%.1f/ no es %d\n",L,K,NF); 
-      return 0;
+      fclose(input);     
+      if(i!=NF)
+	{
+	  printf("Error lineal: El fichero %s no contiene %d líneas\n",cvdata,NF);
+	  return 1;
+      	}
     }
 
-  //TERMALIZACION:
-  sprintf(nametermal,"./MEDIDAS_CV/L%d/K%.1f/termalizacion_Cv_L%d_K%.1f.dat",L,K,L,K);
-  ftermal=fopen(nametermal,"w");
-  printf("\n Plot: Termalización L=%d K=%.1f \n",L,K);
-  printf(" X=1/(nº archivos conservados)\n");
-  printf(" Y=promedio del calor específico\n");
-  printf(" Ind.=índice del primer archivo conservado \n");
-  printf("\n Ind. X  Y\n");
-  for(f=NF/20; f<NF; f++)
-    {      
-      if((NF%f)==0)
-      {
-	media_energia=(Energia[NF-1]-Energia[NF-f-1])/(double) f;
-	caloresp=(Energia2[NF-1]-Energia2[NF-f-1])/(double)f-media_energia*media_energia;
-	caloresp*=(K*K)/((double)N); // promedio calor especifico
-	fprintf(ftermal,"%lf %lf\n",1.0F/(double) f,caloresp);
-	printf(" %d %lf %lf\n",NF-f,1.0F/(double) f,caloresp);
-      }
-    }
-  media_energia=Energia[NF-1]/(double) NF;
-  caloresp=Energia2[NF-1]/(double)NF-media_energia*media_energia;
-  caloresp*=(K*K)/((double)N); // promedio calor especifico
-  fprintf(ftermal,"%lf %lf\n",1.0F/(double) NF,caloresp);
-  printf(" %d %lf %lf\n",0,1.0F/(double) NF,caloresp);
-  fclose(ftermal);
+  //GRÁFICO Histórico
+  plot_historico();
 
-  //GRÁFICA GNUPLOT TERMALIZACION:
-
-  fprintf(pipegp,"set terminal push\n");//Guarda la terminal gp por defecto
-
-  //Guarda el gráfico en formato latex en el disco:
-  fprintf(pipegp,"set terminal epslatex color colortext\n");
-  fprintf(pipegp,"set output \"./MEDIDAS_CV/L%d/K%.1f/Plottermal_Cv-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
-  fprintf(pipegp, "set title \' Gráfico Termalización ($L=%d$ $K=%.1f$) \' \n",L,K);
-  fprintf(pipegp, "set logscale x\n");
-  fprintf(pipegp, "set xlabel \'1/ (n\\textdegree de archivos conservados)\' \n");
-  fprintf(pipegp, "set ylabel \' $\\langle C_v \\rangle$ \'\n");
-  fprintf(pipegp, "plot [][0:] \"%s\" title \'$C_v$\' w lp\n",nametermal);
+  //TERMALIZACION: 
+  plot_termalizacion();
   
-  //vuelve a la anterior terminal gnuplot:
-  fprintf(pipegp,"set output\n");
-  fprintf(pipegp,"set terminal pop\n");
-
-  //gráfico en pantalla:
-  fprintf(pipegp, "set title \" Termalización L=%d K=%.1f\" \n",L,K);
-  fprintf(pipegp, "set logscale x\n");
-  fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n");
-  fprintf(pipegp, "set ylabel\" promedio Cv \"\n");
-  fprintf(pipegp, "plot [][0:] \"%s\" title \"C_v\" w lp\n",nametermal);
-    
-  fflush(pipegp);//vacía el buffer de la tubería gnuplot
-  
-
-  //Entrada del valor del índice del archivo en el que se produce la termalización:
+  //LECTURA del índice del archivo en donde comienza la termalización
   printf("\n Escribe el valor del índice del archivo correspondiente a la termalización=");
- 
   while(scanf("%d",&indtermal)==0 || indtermal<0)
     {
       while (getchar()!= '\n');// para leer un único dato por línea
       printf("\n Debe ser un número entero positivo="); 
     }
 
-  fmax=NF-indtermal;//fmax es ahora el nº total de archivos para los cálculos
-  if(fmax!=NF)
-    {
-      for(f=0; f<fmax; f++)//redefinimos los observables
-	{
-	  Energia[f]=Energia[f+indtermal]-Energia[indtermal-1];
-	  Energia2[f]=Energia2[f+indtermal]-Energia2[indtermal-1];
-	}   
-      media_energia=Energia[fmax-1]/(double) fmax;
-      caloresp=Energia2[fmax-1]/(double)fmax-media_energia*media_energia;
-      caloresp*=(K*K)/((double)N); // promedio calor especifico
-    }
-  printf("\n -> Media Cv= %lf\n",caloresp);
- 
-  // Error en función del nº de bloques
+  // ERROR JACKNIFE
+  error_Jacknife(indtermal);
 
-  sprintf(nameerror,"./MEDIDAS_CV/L%d/K%.1f/error_Cv_L%d_K%.1f.dat",L,K,L,K);
-  ferror=fopen(nameerror,"w");
-  printf("\n Plot: Error vs. tamaño bloque Jacknife L=%d K=%.1f \n",L,K);
-  printf(" X=tamaño del bloque Jacknife\n");
-  printf(" Y=error \n");
-
-  printf("\n X  Y\n"); 
-  for(b=2; b<=fmax; b++)
-    {
-      if((fmax%b)==0)
-	{
-	  n=fmax/b;
-
-	  error_caloresp=0.0F;
-
-	  energiaJK[0]=Energia[n-1];
-	  energia2JK[0]=Energia2[n-1];
-
-	  sumJK_energia=(Energia[fmax-1]-energiaJK[0])/(double)(fmax-n);
-	  sum2JK_energia=(Energia2[fmax-1]-energia2JK[0])/(double)(fmax-n);
-
-	  calorespJK=sum2JK_energia-sumJK_energia*sumJK_energia;
-	  calorespJK*=(K*K)/((double)N);
-	  error_caloresp+=pow(caloresp-calorespJK,2.0);
-
-	  for (k=1; k<b; k++)
-	    {
-	      energiaJK[k]=Energia[(k+1)*n-1]-Energia[k*n-1];
-	      energia2JK[k]=Energia2[(k+1)*n-1]-Energia2[k*n-1];
-	      sumJK_energia=(Energia[fmax-1]-energiaJK[k])/(double)(fmax-n);
-	      sum2JK_energia=(Energia2[fmax-1]-energia2JK[k])/(double)(fmax-n);
-
-	      calorespJK=sum2JK_energia-sumJK_energia*sumJK_energia;
-	      calorespJK*=(K*K)/((double)N);
-	      error_caloresp+=pow(caloresp-calorespJK,2.0);
-	    }
-
-	  error_caloresp=(double)(b-1.)/((double) b) * error_caloresp;
-	  error_caloresp=sqrt(error_caloresp);
-	  fprintf(ferror,"%d %lf\n",n,error_caloresp); 
-	  printf(" %d %lf\n",n,error_caloresp);  
-	}
-    }
-  fclose(ferror);
-      
-  //GRAFICA GNUPLOT ERROR: Error en función del tamaño del bloque Jacknife
-
-  fprintf(pipegp,"set terminal push\n");//Almacena el anterior terminal gp
-  
-  //Guardamos el gráfico en formato latex en el disco:
-  fprintf(pipegp,"set terminal epslatex color colortext\n");
-  fprintf(pipegp,"set output \"./MEDIDAS_CV/L%d/K%.1f/Ploterror_Cv-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
-  fprintf(pipegp, "set title \' Error vs Tamaño Jacknife ($L=%d$ $K=%.1f$) \' \n",L,K);
-  fprintf(pipegp, "set logscale x\n");
-  fprintf(pipegp, "set xlabel \'Tamaño del bloque Jacknife (sweeps/$\\tau_0$)\' \n");
-  fprintf(pipegp, "set ylabel \' Error $C_v$ \'\n");
-  fprintf(pipegp, "plot \"%s\" title \'Error $C_v$\' w lp\n",nameerror);
-
-  //Vuelve a la anterior terminal gnuplot:
-  fprintf(pipegp,"set output\n");
-  fprintf(pipegp,"set terminal pop\n");
-
-  //Gráfico en pantalla:  
-  fprintf(pipegp, "set title \" Error vs. tamaño del bloque Jacknife L=%d K=%.1f\" \n",L, K);
-  fprintf(pipegp, "set logscale x\n");
-  fprintf(pipegp, "set xlabel\" tamaño del bloque Jacknife (sweeps/tau)\"\n");
-  fprintf(pipegp, "set ylabel\"Error Cv \"\n");  
-  fprintf(pipegp, "plot \"%s\" title \"Cv\" w lp\n",nameerror);
-
-  //Vacía el buffer de la tubería gnuplot y se cierra:
-  fflush(pipegp);
-  //close(pipegp);
-  
-
-  //Lectura valor del donde estabiliza el error
-
+  // LECTURA del tamaño del bloque jacknife donde comienza el plateau:
   printf("\n Escribe el tamaño del bloque Jacknife en donde se estabiliza el error=");  
   while(scanf("%d",&nbloq)==0 || nbloq<0)
     {
       while (getchar()!= '\n');// para leer un único dato por línea
       printf("\n Debe ser un número entero positivo="); 
-    }
-  
-  ferror=fopen(nameerror,"r");//Abrimos el archivo de errores para lectura
+    } 
+  sprintf(namein,"./MEDIDAS_Cv/L%d/K%.1f/error_Cv_L%d_K%.1f.dat",L,K,L,K); //Abrimos el archivo de errores para lectura
+
+  input=fopen(namein,"r");
+  n=0;
   while(nbloq!=n)
     {
-      if(fscanf(ferror,"%d %lf",&n,&error_caloresp)==EOF)
+      if(fscanf(input,"%d %lf",&n,&error_cv)==EOF)
 	{
-	  close(ferror);
+	  close(input);
 	  printf("\n Debe ser un número válido de elementos del bloque Jacknife=");  
 	  while(scanf("%d",&nbloq)==0 || nbloq<0)
 	    {
 	      while (getchar()!= '\n');// para leer un único dato por línea
 	      printf("\n Escribe un número entero positivo="); 
 	    }
-	  ferror=fopen(nameerror,"r");
+	  input=fopen(namein,"r");
 	}
     }
-  close(ferror);
- 
-  printf("\n ->Cv=%lf +- %lf\n", caloresp, error_caloresp);
+  close(input);
+  printf("\n -> Cv=%lf +- %lf\n", cv, error_cv);
 
-  //Escribe el valor de la medida con su error en el archivo Medidas_Cv..
-  sprintf(nameCv,"./MEDIDAS_CV/L%d/Medidas_Cv_L%d.dat",L,L);
-  fileCv=fopen(nameCv,"a");
-  fprintf(fileCv,"%lf %lf %lf\n", K, caloresp, error_caloresp,indtermal,nbloq);
-  close(fileCv);
-  close(pipegp);
-  return 1;
+  //ESCRITURA RESULTADOS: 
+  sprintf(nameout,"./MEDIDAS_Cv/L%d/Medidas_Cv_L%d.dat",L,L);
+  output=fopen(nameout,"a");
+  fprintf(output,"%lf %lf %lf %d %d\n", K, cv, error_cv,NF-indtermal,nbloq);
+  close(output);
+  return 0;
 }
 
 double energia_curvatura(void)
@@ -594,5 +431,254 @@ int index_plqta_prox(int i, int dir)
       break;
     }
   return p;
+}
+int Cv_file(void )
+{
+  int f,i;
+  FILE *input;
+  FILE *output;
+  char namein[255];
+  char nameout[255];
+
+  f=0;
+  Se[NF-1]=0.0F;
+  Se2[NF-1]=0.0F;
+
+  sprintf(nameout,"./MEDIDAS_Cv/L%d/K%.1f/Cv_L%d_K%.1f.dat",L,K,L,K);
+  output=fopen(nameout,"w");
+  sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
+  while((input=fopen(namein,"r"))!=NULL)
+    {
+      i=0;      
+      while(fscanf(input,"%lf %lf %lf",&x[i].a,&x[i].b,&x[i].c)!=EOF)
+	{
+	  i++;
+	}
+      fclose(input);     
+      if(i!=N)
+	{
+	  printf("Error lineal: El fichero %s no contiene %d líneas\n",namein,N);
+	  return 1;
+	}
+      se[f]=energia_curvatura();
+      Se[NF-1]+=se[f];
+      Se[f]=Se[NF-1];
+
+      Se2[NF-1]+=(se[f]*se[f]);
+      Se2[f]=Se2[NF-1];
+
+      cv=Se2[f]/(double)(f+1)-Se[f]*Se[f]/(double)(f+1)/(double)(f+1);
+      cv*=(K*K)/((double)N);
+      // Escribimos los resultados en el archivo "output"
+      fprintf(output,"%lf %lf %lf %lf\n",se[f],Se[f],Se2[f],cv);
+      f++;
+      sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
+    }
+  fclose(output);
+  if(f!=NF)
+    {
+      printf("Error lectura: El número de archivos leidos en ./RUNS/L%d/K%.1f/ no es %d\n",L,K,NF); 
+      return 1;
+    }
+  return 0;
+}
+void plot_historico(void )
+{
+  FILE *pipegp = popen("gnuplot -persist","w");// Tubería a gnuplot (gráficas)  
+  char nameout[255];
+
+  sprintf(nameout,"./MEDIDAS_Cv/L%d/K%.1f/Cv_L%d_K%.1f.dat",L,K,L,K);
+  fprintf(pipegp,"set terminal qt 1\n");//Guarda la terminal gp por defecto
+  fprintf(pipegp,"set terminal push\n");//Guarda la terminal gp por defecto
+
+  //Guarda el gráfico en formato latex en el disco:
+  fprintf(pipegp,"set terminal epslatex color colortext\n");
+  fprintf(pipegp,"set output \"./MEDIDAS_Cv/L%d/K%.1f/Phistorico_Cv-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp, "set title \' Histórico medidas ($L=%d$ $K=%.1f$) \' \n",L,K);
+  fprintf(pipegp, "set xlabel \'Sweeps\' \n");
+  fprintf(pipegp, "set ylabel \' $\\langle R^2_g \\rangle$ \'\n");
+  fprintf(pipegp, "plot \"%s\" u 4 title \'$R_g^2$\' w lp\n",nameout);
+  
+  //vuelve a la anterior terminal gnuplot:
+  fprintf(pipegp,"set output\n");
+  fprintf(pipegp,"set terminal pop\n");
+
+  //gráfico en pantalla:
+  fprintf(pipegp, "set title \" Histórico medidas L=%d K=%.1f\" \n",L,K);
+  fprintf(pipegp, "set xlabel\" Sweeps\"\n");
+  fprintf(pipegp, "set ylabel\" Cv \"\n");
+  fprintf(pipegp, "plot \"%s\"  u 4 title \"Rg^2\" w lp\n",nameout);
+    
+  fflush(pipegp);//vacía el buffer de la tubería gnuplot:
+  close(pipegp); 
+}
+void plot_termalizacion(void)
+{
+  int f;
+  double media,media_cv;
+  FILE *pipegp = popen("gnuplot -persist","w");// Tubería a gnuplot (gráficas)  
+  FILE *output;
+  
+  char nameout[255];
+
+  sprintf(nameout,"./MEDIDAS_Cv/L%d/K%.1f/logtermal_Cv_L%d_K%.1f.dat",L,K,L,K);
+  output=fopen(nameout,"w");
+  printf("\n Plot: Termalización L=%d K=%.1f \n",L,K);
+  printf(" X=1/(nº archivos conservados)\n");
+  printf(" Y=promedio del radio del giratón al cuadrado\n");
+  printf(" Ind.=índice del primer archivo conservado \n");
+  printf("\n Ind. X  Y\n");
+  for(f=NF/20; f<NF; f++)
+    {      
+      if((NF%f)==0)
+      {
+	media=(Se[NF-1]-Se[NF-f-1])/(double) f;
+	media_cv=(Se2[NF-1]-Se2[NF-f-1])/(double)f-media*media;
+	media_cv*=(K*K)/((double)N); // promedio calor especifico
+	fprintf(output,"%lf %lf\n",1.0F/(double) f,media_cv);
+	printf(" %d %lf %lf\n",NF-f,1.0F/(double) f,media_cv);
+      }
+    }
+  media=Se[NF-1]/(double)NF;
+  media_cv=Se2[NF-1]/(double)NF-media*media;
+  media_cv*=(K*K)/((double)N); // promedio calor especifico
+  fprintf(output,"%lf %lf\n",1.0F/(double)NF,media_cv);
+  printf(" %d %lf %lf\n",0,1.0F/(double) f,media_cv);
+  fclose(output);
+
+  //GRÁFICA GNUPLOT TERMALIZACION:
+
+  fprintf(pipegp,"set terminal qt 2\n");
+  fprintf(pipegp,"set terminal push\n");//Guarda la terminal gp por defecto
+
+  //Guarda el gráfico en formato latex en el disco:
+  fprintf(pipegp,"set terminal epslatex color colortext\n");
+  fprintf(pipegp,"set output \"./MEDIDAS_Cv/L%d/K%.1f/Plogtermal_Cv-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp, "set title \' Gráfico Termalización ($L=%d$ $K=%.1f$) \' \n",L,K);
+  fprintf(pipegp, "set logscale x\n");
+  fprintf(pipegp, "set xlabel \'1/ (n\\textdegree de archivos conservados)\' \n");
+  fprintf(pipegp, "set ylabel \' $\\langle Cv \\rangle$ \'\n");
+  fprintf(pipegp, "plot \"%s\" title \'$Cv$\' w lp\n",nameout);
+  
+  //vuelve a la anterior terminal gnuplot:
+  fprintf(pipegp,"set output\n");
+  fprintf(pipegp,"set terminal pop\n");
+
+  //gráfico en pantalla:
+  fprintf(pipegp, "set title \" Termalización L=%d K=%.1f\" \n",L,K);
+  fprintf(pipegp, "set logscale x\n");
+  fprintf(pipegp, "set xlabel\" nº de archivos conservados\"\n");
+  fprintf(pipegp, "set ylabel\" promedio cv \"\n");
+  fprintf(pipegp, "plot \"%s\" title \"Cv\" w lp\n",nameout);
+    
+  fflush(pipegp);//vacía el buffer de la tubería gnuplot:
+  close(pipegp);
+}
+void error_Jacknife(int index)
+{
+  int b,n,f,k;
+  int fmax;
+
+  double seJK[NF];
+  double sumJK_se;
+
+  double se2JK[NF];
+  double sumJK_se2;
+  double cvJK;
+  double Senew[NF];
+  double Se2new[NF];
+  double Seref;
+  double Se2ref;
+
+  FILE *output;// Archivo de escritura = Error vs. Tamaño del bloque Jacknife 
+  char nameout[255];
+
+  FILE *pipegp = popen("gnuplot -persist","w");// Tubería a gnuplot (gráficas)
+
+  fmax=NF-index;//fmax es ahora el nº total de archivos para los cálculos
+ 
+  Seref=Se[index-1];
+  Se2ref=Se2[index-1];
+  for(f=0; f<fmax; f++)
+    {
+      Senew[f]=Se[f+index]-Seref;
+      Se2new[f]=Se2[f+index]-Se2ref;
+    }   
+  
+  media_se=Senew[fmax-1]/(double)fmax;
+  cv=Se2new[fmax-1]/(double)fmax-media_se*media_se;
+  cv*=(K*K)/((double)N);
+  sprintf(nameout,"./MEDIDAS_Cv/L%d/K%.1f/error_Cv_L%d_K%.1f.dat",L,K,L,K);
+  output=fopen(nameout,"w");
+  printf("\n Plot: Error vs. tamaño bloque Jacknife L=%d K=%.1f \n",L,K);
+  printf(" X=tamaño del bloque Jacknife\n");
+  printf(" Y=error \n");
+  
+  printf("\n X  Y\n"); 
+  for(b=2; b<=fmax; b++)
+    {
+      if((fmax%b)==0)
+	{
+	  n=fmax/b;
+	  error_cv=0.0F;
+
+	  seJK[0]=Senew[n-1];
+	  se2JK[0]=Se2new[n-1];
+
+	  sumJK_se=(Senew[fmax-1]-seJK[0])/(double)(fmax-n);
+	  sumJK_se2=(Se2new[fmax-1]-se2JK[0])/(double)(fmax-n);
+	  
+	  cvJK=sumJK_se2-sumJK_se*sumJK_se;
+	  cvJK*=(K*K)/((double)N);
+	  error_cv+=pow(cv-cvJK,2.0);
+	  
+	  for (k=1; k<b; k++)
+	    {
+	      seJK[k]=Senew[(k+1)*n-1]-Senew[k*n-1];
+	      se2JK[k]=Se2new[(k+1)*n-1]-Se2new[k*n-1];
+	      sumJK_se=(Senew[fmax-1]-seJK[k])/(double)(fmax-n);
+	      sumJK_se2=(Se2new[fmax-1]-se2JK[k])/(double)(fmax-n);
+
+	      cvJK=sumJK_se2-sumJK_se*sumJK_se;
+	      cvJK*=(K*K)/((double)N);
+	      error_cv+=pow(cv-cvJK,2.0);
+	    }
+
+	  error_cv=(double)(b-1.0F)/((double) b) * error_cv;
+	  error_cv=sqrt(error_cv);
+	  fprintf(output,"%d %lf\n",n,error_cv); 
+	  printf(" %d %lf\n",n,error_cv);  
+	}
+    }
+  fclose(output);
+      
+  //GRAFICA GNUPLOT ERROR
+  fprintf(pipegp,"set terminal qt 3\n");
+  fprintf(pipegp,"set terminal push\n");//Almacena el anterior terminal gp
+
+  //Guardamos el gráfico en formato latex en el disco:
+  fprintf(pipegp,"set terminal epslatex color colortext\n");
+  fprintf(pipegp,"set output \"./MEDIDAS_Cv/L%d/K%.1f/Perror_Cv-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
+  fprintf(pipegp, "set title \' Error vs Tamaño Jacknife ($L=%d$ $K=%.1f$) \' \n",L,K);
+  fprintf(pipegp, "set logscale x\n");
+  fprintf(pipegp, "set xlabel \'Tamaño del bloque Jacknife (sweeps/$\\tau_0$)\' \n");
+  fprintf(pipegp, "set ylabel \' Error $Cv$ \'\n");
+  fprintf(pipegp, "plot \"%s\" title \'Error $Cv$\' w lp\n",nameout);
+
+  //Vuelve a la anterior terminal gnuplot:
+  fprintf(pipegp,"set output\n");
+  fprintf(pipegp,"set terminal pop\n");
+
+  //Gráfico en pantalla:  
+  fprintf(pipegp, "set title \" Error vs. tamaño del bloque Jacknife L=%d K=%.1f\" \n",L, K);
+  fprintf(pipegp, "set logscale x\n");
+  fprintf(pipegp, "set xlabel\" tamaño del bloque Jacknife (sweeps/tau)\"\n");
+  fprintf(pipegp, "set ylabel\"Error Cv \"\n");  
+  fprintf(pipegp, "plot \"%s\" title \"Cv\" w lp\n",nameout);
+
+
+  //Vacía el buffer de la tubería gnuplot y se cierra:
+  fflush(pipegp);
+  close(pipegp);
 }
 
