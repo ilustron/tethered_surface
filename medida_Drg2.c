@@ -106,6 +106,7 @@ int main(void )
 	}
     }
 
+  
   //MEDIDA/LECTURA del Radio del giratón al para cada configuración:
   sprintf(drg2data,"./MEDIDAS_Drg2/L%d/K%.1f/Drg2_L%d_K%.1f.dat",L,K,L,K);
   if((input=fopen(drg2data,"r"))==NULL)
@@ -116,7 +117,7 @@ int main(void )
   else
     {
       i=0;      
-      while(fscanf(input,"%lf %lf",&rg2[i],&Rg2[i],&se[i],&Se[i],&rg2se[i],&Rg2Se[i],&drg2)!=EOF)
+      while(fscanf(input,"%lf %lf %lf %lf %lf %lf %lf",&rg2[f],&Rg2[f],&se[f],&Se[f],&rg2se[f],&Rg2Se[f],&drg2)!=EOF)
 	{
 	  i++;
 	}
@@ -510,7 +511,7 @@ int Drg2_file(void )
       drg2=Rg2Se[f]/(double)(f+1)-Se[f]*Rg2[f]/(double)(f+1)/(double)(f+1);
 
       // Escribimos los resultados en el archivo
-      fprintf(output,"%lf %lf %lf %lf %lf %lf %lf\n",rg2[f],Rg2[f],se[f],Se[f],rg2se[f],Rg2Se[f],drg2);
+      fprintf(output,"%lf %lf %lf %lf %lf %lf %lf \n",rg2[f],Rg2[f],se[f],Se[f],rg2se[f],Rg2Se[f],drg2);
       f++;
       sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
     }
@@ -536,8 +537,8 @@ void plot_historico(void )
   fprintf(pipegp,"set output \"./MEDIDAS_Drg2/L%d/K%.1f/Phistorico_Drg2-L%d-K%d.tex\" \n",L,K,L,(int)(10*K));
   fprintf(pipegp, "set title \' Histórico medidas ($L=%d$ $K=%.1f$) \' \n",L,K);
   fprintf(pipegp, "set xlabel \'Sweeps\' \n");
-  fprintf(pipegp, "set ylabel \' $\\langle S_e \\rangle$ \'\n");
-  fprintf(pipegp, "plot \"%s\" u 1 title \'$S_e$\' w lp\n",nameout);
+  fprintf(pipegp, "set ylabel \' $\\langle DR_g^2 \\rangle$ \'\n");
+  fprintf(pipegp, "plot \"%s\" u 1 title \'$Drg2$\' w lp\n",nameout);
   
   //vuelve a la anterior terminal gnuplot:
   fprintf(pipegp,"set output\n");
@@ -547,7 +548,7 @@ void plot_historico(void )
   fprintf(pipegp, "set title \" Histórico medidas L=%d K=%.1f\" \n",L,K);
   fprintf(pipegp, "set xlabel\" Sweeps\"\n");
   fprintf(pipegp, "set ylabel\" Drg2 \"\n");
-  fprintf(pipegp, "plot \"%s\"  u 7 title \"Drg2\" w lp \n",nameout);
+  fprintf(pipegp, "plot \"%s\"  u 7 title \"Se\" w lp \n",nameout);
     
   fflush(pipegp);//vacía el buffer de la tubería gnuplot:
   close(pipegp); 
@@ -598,7 +599,7 @@ void plot_termalizacion(void)
   fprintf(pipegp, "set title \' Gráfico Termalización ($L=%d$ $K=%.1f$) \' \n",L,K);
   fprintf(pipegp, "set logscale x\n");
   fprintf(pipegp, "set xlabel \'1/ (n\\textdegree de archivos conservados)\' \n");
-  fprintf(pipegp, "set ylabel \' $\\langle drg2 \\rangle$ \'\n");
+  fprintf(pipegp, "set ylabel \' $\\langle DR_g^2 \\rangle$ \'\n");
   fprintf(pipegp, "plot \"%s\" title \'$DR^2_g$\' w lp\n",nameout);
   
   //vuelve a la anterior terminal gnuplot:
@@ -649,11 +650,19 @@ void error_Jacknife(int index)
 
   fmax=NF-index;//fmax es ahora el nº total de archivos para los cálculos
  
-  Seref=Se[index-1];
-  Rg2ref=Rg2[index-1];
-  Rg2Seref=Rg2Se[index-1];
+  
+  Seref=0.0F;
+  Rg2ref=0.0F;
+  Rg2Seref=0.0F;   
+  if(fmax<NF)
+  {
+    Seref=Se[index-1];
+    Rg2ref=Rg2[index-1];
+    Rg2Seref=Rg2Se[index-1];
+  }
+  
 
-  for(f=0; f<fmax; f++)
+  for(f=0; f<fmax; f++) 
     {
       Senew[f]=Se[f+index]-Seref;
       Rg2new[f]=Rg2[f+index]-Rg2ref;

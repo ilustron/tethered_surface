@@ -572,8 +572,12 @@ void error_Jacknife(int index)
   FILE *pipegp = popen("gnuplot -persist","w");// Tubería a gnuplot (gráficas)
 
   fmax=NF-index;//fmax es ahora el nº total de archivos para los cálculos
-  
-  Seref=Se[index-1];
+
+  Seref=0.0F;
+  if(fmax<NF)
+  {
+    Seref=Se[index-1];
+  }
   for(f=0; f<fmax; f++)
     {
       Senew[f]=Se[f+index]-Seref;

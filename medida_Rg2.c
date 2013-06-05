@@ -350,7 +350,12 @@ void error_Jacknife(int index)
 
   fmax=NF-index;//fmax es ahora el nº total de archivos para los cálculos
  
-  Rg2ref=Rg2[index-1];
+  Rg2ref=0.0F;
+  if(fmax<NF)
+  {
+    Rg2ref=Rg2[index-1];
+  }
+
   for(f=0; f<fmax; f++)
     {
       Rg2new[f]=Rg2[f+index]-Rg2ref;
