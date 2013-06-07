@@ -6,65 +6,87 @@
 #define L 16 // tamaño lineal de la red
 #define N L*L
 #define K 0.8 // kappa correspondiente a la configuración
-#define ERROR 0.0649 // error de Cv para estimar el rango de extrapolación
-
-double se[NF],se2[NF],Se[NF],Se2[NF],cv;
+#define F 1000 //número de archivos termalizados
+#define NP 50 //numero de extrapolaciones
+#define A 3 // factor sigma de se
+#define NJK 10 //tamaño bloque jacknife 
+double se[F],se2[F],Se[F],Se2[F],cv;//observables de lectura
+double se_media[NP],se2_media[NP];
 
 double se_estimado(double);
 double se2_estimado(double);
 
 int main(void )
 {
-  FILE *inputse,*output;
-  char sedata[256],cvdata[256];
+  FILE *input_se,*output_cvpro;
+  char se_data[256],cvpro_data[256];
   
-  double se_new,se2_new;
-  double cv;
+  double se_new,se2_new,cv_new;
   double k,l;
+  double sigma_se;
   int i;
 
-  //Lee el valor de se para cada confguración
+  double trash;
 
-  sprintf(sedata,"./MEDIDAS_Cv/L%d/K%.1f/Cv_L%d_K%.1f.dat",L,K,L,K);
-  if((inputse=fopen(sedata,"r"))==NULL)
+  //Lee el valor de se para cada configuración
+
+  sprintf(se_data,"./MEDIDAS_Cv/L%d/K%.1f/Cv_L%d_K%.1f.dat",L,K,L,K);
+  if((input_se=fopen(se_data,"r"))==NULL)
     {
-      printf("Error existencial: El fichero %s no existe\n",sedata);
+      printf("Error existencial: El fichero %s no existe\n",se_data);
       return 1;
     }
   else
     {
-      i=0;      
-      while(fscanf(inputse,"%lf %lf %lf %lf",&se[i],&Se[i],&Se2[i],&cv)!=EOF)
+      i=0;
+      while((fscanf(input_se,"%lf %lf %lf %lf",&se[0],&trash,&trash,&trash)!=EOF)&&(i<(NF-F)))
+	i++;
+		
+      se2[0]=se[0]*se[0];
+
+      Se[F-1]+=se[0];
+      Se[0]=Se[F-1];
+
+      Se2[F-1]+=se2[0];
+      Se2[0]=Se2[F-1];
+
+      i=1;
+      while(fscanf(input_se,"%lf %lf %lf %lf",&se[i],&trash,&trash,&trash)!=EOF)
 	{
 	  se2[i]=se[i]*se[i];
+
+	  Se[F-1]+=se[i];
+	  Se[i]=Se[F-1];
+
+	  Se2[F-1]+=se2[i];
+	  Se2[i]=Se2[F-1];;
 	  i++;
 	}
-      fclose(inputse);     
-      if(i!=NF)
+      fclose(input_se);
+      if(i!=F)
 	{
-	  printf("Error lineal: El fichero %s no contiene %d líneas\n",sedata,NF);
+	  printf("Error lineal: El fichero %s no contiene %d líneas, tiene %d\n",se_data,F,i);
 	  return 1;
       	}
     }
   
-  printf("%lf\n",cv);
+  sigma_se=sqrt(Se2[F-1]/(double)F-Se[F-1]*Se[F-1]/(double)F/(double)F);
+
   //Cálculo de los nuevos observables
 
-  sprintf(cvdata,"./MEDIDAS_Cv/L%d/extrapolacion_Cv_L%d_K%.1f.dat",L,K,L,K);
-  output=fopen(cvdata,"w");
-  for(l=-0.1; l<=0.1; l+=0.001)
+  sprintf(cvpro_data,"./MEDIDAS_Cv/L%d/extrapolacion_Cv_L%d_K%.1f.dat",L,K,L,K);
+  output_cvpro=fopen(cvpro_data,"w");
+  for(l=-1; l<=1; l+=(1.0F/(double) NP))
     {
-      k=K+l;     
+      k=K+l*((double)A/sigma_se);     
       se_new=se_estimado(k);
       se2_new=se2_estimado(k);
-      cv=se2_new-se_new*se_new;
-      cv*=(k*k)/((double) N);
-      fprintf(output,"%lf %lf \n",k,cv);
+      cv_new=se2_new-se_new*se_new;
+      cv_new*=(k*k)/((double) N);
+      fprintf(output_cvpro,"%lf %lf \n",k,cv_new);
     }
-  close(output);
+  close(output_cvpro);
   return 0;
-
-  
 }
 
 double se_estimado(double k)
@@ -73,7 +95,7 @@ double se_estimado(double k)
   double num,den;
 
   num=den=0.0F;
-  for(i=0; i<NF; i++)
+  for(i=0; i<F; i++)
     {
       num+=se[i]*exp(-(K-k)*se[i]);
       den+=exp(-(K-k)*se[i]);
@@ -86,7 +108,7 @@ double se2_estimado(double k)
   double num,den;
 
   num=den=0.0F;
-  for(i=0; i<NF; i++)
+  for(i=0; i<F; i++)
     {
       num+=se2[i]*exp(-(K-k)*se[i]);
       den+=exp(-(K-k)*se[i]);
