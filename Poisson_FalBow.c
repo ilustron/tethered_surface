@@ -3,12 +3,12 @@
 #include <math.h>
 
 
-#define L 16
+#define L 192
 #define N L*L 
 #define M 2*(L-1)*(L-1) 
-#define K 10 // Kappa 
-#define NF 24000 // nº de archivos
-#define B 200 // nº de bloques (Jack-Knife)
+#define K 2.0 // Kappa 
+#define NF 1000 // nº de archivos
+#define B 10 // tamaño del bloque (Jack-Knife)
 
 #define _prodesc(w,u) (w.a*u.a+w.b*u.b+w.c*u.c)
 
@@ -109,7 +109,8 @@ int main(void)
   // Se leen las posiciones de cada archivo
 
   f=0;
-  sprintf(namein,"xpos_L%d_K10-%d.dat",L,f);
+  sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
+  
   while((input=fopen(namein,"r"))!=NULL)
     {
       i=0;
@@ -159,7 +160,7 @@ int main(void)
       GxxGyy[f]=GxxGyy[NF-1];
 
       f++;      
-      sprintf(namein,"xpos_L%d_K10-%d.dat",L,f);
+      sprintf(namein,"./RUNS/L%d/K%.1f/xpos_L%d_K%.1f-%d.dat",L,K,L,K,f);
     }
 
   if(f!=NF)
@@ -184,7 +185,7 @@ int main(void)
 
   //Error de los observables hexagonales
 
-  for(b=200; b<=200; b++)
+  for(b=B; b<=B; b++)
     {
       if((NF%b)==0)
 	{
@@ -211,7 +212,7 @@ int main(void)
   
   // Errores de los observables cartesianos
 
-  for(b=200; b<=200; b++)
+  for(b=B; b<=B; b++)
     {
       if((NF%b)==0)
 	{

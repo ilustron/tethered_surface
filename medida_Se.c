@@ -242,7 +242,7 @@ double energia_curvatura(void)
 	  energia+=_prodesc(n[p[i][3]],n[p[i][2]]);
 	}      
     }
-
+  energia=energia/(double) N;
     return energia;
 }
 
